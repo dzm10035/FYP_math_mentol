@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MathMentor - Login/Register</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/auth.css') }}">
+    
+    <style>
+        .input-error {
+            display: none;
+            color: #c00;
+            font-size: 12px;
+            margin-top: 5px;
+        }
+
+        .input-help {
+            color: #666;
+            font-size: 12px;
+            margin-top: 5px;
+            display: block;
+        }
+
+        input.error {
+            border-color: #c00;
+        }
+
+        .message-container {
+            margin-top: 15px;
+            min-height: 40px;
+            width: 100%;
+            display: block;
+        }
+
+        .message {
+            padding: 10px;
+            border-radius: 4px;
+            text-align: center;
+            margin-top: 10px;
+            width: 100%;
+            box-sizing: border-box;
+            display: block;
+        }
+        
+        .message.error {
+            background-color: #fee;
+            color: #c00;
+            border: 1px solid #c00;
+        }
+        
+        .message.success {
+            background-color: #efe;
+            color: #0a0;
+            border: 1px solid #0a0;
+        }
+    </style>
+</head>
+<body>
+    <div class="auth-container">
+        <div class="auth-box">
+            <div class="auth-tabs">
+                <a href="#" class="tab active" onclick="showTab('login')">Login</a>
+                <a href="#" class="tab" onclick="showTab('register')">Register</a>
+            </div>
+            
+            <!-- Login Form -->
+            <form id="loginForm" class="auth-form" onsubmit="handleLogin(event)">
+                <div class="form-group">
+                    <input type="email" name="email" placeholder="Email" required>
+                    <div class="input-error"></div>
+                </div>
+                <div class="form-group">
+                    <input type="password" name="password" placeholder="Password" required>
+                    <div class="input-error"></div>
+                </div>
+                <button type="submit" class="btn-primary">Login</button>
+                <div class="form-links">
+                    <a href="{{ url_for('auth.forgot_password_page') }}">Forgot Password?</a>
+                </div>
+                <div id="loginMessage" class="message-container"></div>
+            </form>
+            
+            <!-- Register Form -->
+            <form id="registerForm" class="auth-form" style="display: none;" onsubmit="handleRegister(event)">
+                <div class="form-group">
+                    <input type="email" name="email" placeholder="Email" required>
+                    <div class="input-error"></div>
+                </div>
+                <div class="form-group">
+                    <input type="text" name="username" placeholder="Username" required minlength="2" maxlength="30">
+                    <div class="input-error"></div>
+                    <small class="input-help">Username must be 2-30 characters long</small>
+                </div>
+                <div class="form-group">
+                    <input type="password" name="password" placeholder="Password" required 
+                           minlength="6" pattern="^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d]{6,}$">
+                    <div class="input-error"></div>
+                    <small class="input-help">Password must be at least 6 characters long and contain both letters and numbers.</small>
+                </div>
+                <div class="form-group">
+                    <input type="password" name="confirmPassword" placeholder="Confirm Password" required>
+                    <div class="input-error"></div>
+                </div>
+                <div class="form-group">
+                    <select name="language" required>
+                        <option value="en">English</option>
+                        <option value="zh">Chinese</option>
+                        <option value="ms">Malay</option>
+                    </select>
+                    <small class="input-help">Choose your preferred language for math content</small>
+                </div>
+                <button type="submit" class="btn-primary">Register</button>
+                <div id="registerMessage" class="message-container"></div>
+            </form>
+        </div>
+    </div>
+    
+    <script src="{{ url_for('static', filename='js/auth.js') }}"></script>
+
+</body>
+</html> 

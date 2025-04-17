@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Markdown & KaTeX Debug</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <style>
+        body {
+            max-width: 800px;
+            margin: 20px auto;
+            padding: 0 20px;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        }
+        .debug-section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .debug-title {
+            font-weight: bold;
+            margin-bottom: 10px;
+            color: #333;
+        }
+        #input {
+            width: 100%;
+            height: 200px;
+            margin: 10px 0;
+            padding: 10px;
+            font-family: monospace;
+        }
+        #rawOutput, #renderedOutput {
+            white-space: pre-wrap;
+            font-family: monospace;
+            background: #f5f5f5;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+        }
+        .error {
+            color: red;
+            margin: 10px 0;
+        }
+        .katex { font-size: 1.1em; }
+        .katex-display { margin: 1em 0; }
+    </style>
+</head>
+<body>
+    <h1>Markdown & KaTeX Debug</h1>
+    
+    <div class="debug-section">
+        <div class="debug-title">Input:</div>
+        <textarea id="input">Basic expressions:
+
+\[ y = 7 - 2\left(\frac{18}{7}\right) \]
+
+Simplify:
+
+\[ y = 7 - \frac{36}{7} \]
+
+Here's the notation for the n-th square root:
+
+\[ \sqrt[n]{x} \]
+
+This represents the n-th root of \( x \). For example:
+
+- The square root: \[ \sqrt{16} = 4 \]
+- The cube root: \[ \sqrt[3]{27} = 3 \]
+
+Testing inline expressions:
+The value of \( \sqrt[n]{x} \) represents the n-th root of x.
+
+这是**加粗文本**测试
+这是 **加粗文本** 测试（带空格）
+这是**多个**加粗**文本**测试</textarea>
+        <button onclick="processInput()">Process</button>
+    </div>
+
+    <div class="debug-section">
+        <div class="debug-title">Raw Processed Output:</div>
+        <div id="rawOutput"></div>
+    </div>
+
+    <div class="debug-section">
+        <div class="debug-title">Rendered Output:</div>
+        <div id="renderedOutput"></div>
+    </div>
+
+    <div id="error" class="error"></div>
+
+    <script>
+        function escapeHtml(text) {
+            return text
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
+
+        function processInput() {
+            const input = document.getElementById('input').value;
+            const errorDiv = document.getElementById('error');
+            const rawOutput = document.getElementById('rawOutput');
+            const renderedOutput = document.getElementById('renderedOutput');
+            
+            try {
+                let processed = input;
+
+                // 处理块级数学表达式 \[ ... \]
+                processed = processed.replace(/\\\[([\s\S]*?)\\\]/g, (match, content) => {
+                    try {
+                        return katex.renderToString(content.trim(), {
+                            displayMode: true,
+                            throwOnError: false
+                        });
+                    } catch (e) {
+                        console.error('KaTeX block error:', e);
+                        return `<div style="color: red;">[KaTeX Error: ${e.message}]</div>`;
+                    }
+                });
+
+                // 处理行内数学表达式 \( ... \)
+                processed = processed.replace(/\\\(([\s\S]*?)\\\)/g, (match, content) => {
+                    try {
+                        return katex.renderToString(content.trim(), {
+                            displayMode: false,
+                            throwOnError: false
+                        });
+                    } catch (e) {
+                        console.error('KaTeX inline error:', e);
+                        return `<span style="color: red;">[KaTeX Error: ${e.message}]</span>`;
+                    }
+                });
+
+                // 显示原始处理后的HTML
+                rawOutput.textContent = processed;
+
+                // 渲染Markdown和处理后的数学表达式
+                renderedOutput.innerHTML = marked.parse(processed);
+                
+                errorDiv.textContent = '';
+            } catch (e) {
+                console.error('Processing error:', e);
+                errorDiv.textContent = `Error: ${e.message}`;
+            }
+        }
+
+        // 初始加载时处理一次
+        window.onload = processInput;
+    </script>
+</body>
+</html> 

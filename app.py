@@ -1,0 +1,152 @@
+from flask import Flask, render_template, session, redirect, url_for, request, jsonify
+from datetime import datetime, timedelta
+import pytz
+import json
+from openai import OpenAI
+import logging
+from dotenv import load_dotenv
+import os
+from functools import wraps
+from routes.admin import admin_bp
+from database import users_collection, sessions_collection, messages_collection
+
+# Load environment variables first
+load_dotenv()
+
+# global variables
+gmt8 = pytz.timezone('Asia/Singapore')  
+client = None
+logger = None
+
+# authentication decorator
+def login_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'user_id' not in session:
+            return redirect(url_for('auth.auth_page'))
+        return f(*args, **kwargs)
+    return decorated_function
+
+# Load system message from rule.json
+def load_system_message(file_path="rule.json", lang_code=None):
+    """Load system message from rule.json based on language code"""
+    try:
+        with open(file_path, "r", encoding="utf-8") as file:
+            data = json.load(file)
+            if lang_code == "zh" and "system_message_zh" in data:
+                return {"role": "system", "content": data["system_message_zh"]}
+            elif lang_code == "ms" and "system_message_ms" in data:
+                return {"role": "system", "content": data["system_message_ms"]}
+            else:
+                return {"role": "system", "content": data["system_message_en"]}
+    except FileNotFoundError:
+        return {"role": "system", "content": "You are MathMentor, a virtual math assistant designed to help learners understand mathematical concepts step-by-step. Always provide detailed explanations, encourage critical thinking, and adapt to the user's knowledge level."}
+
+# Ensure indexes for performance
+def setup_indexes():
+    try:
+        # Delete old indexes
+        messages_collection.drop_indexes()
+        sessions_collection.drop_indexes()
+        
+        # Create new indexes
+        sessions_collection.create_index([("session_id", 1)], unique=True)
+        sessions_collection.create_index([("updated_at", -1)])
+        messages_collection.create_index([("session_id", 1)])
+        messages_collection.create_index([("sequence", 1)])
+        
+        logger.info("Database indexes setup completed successfully")
+    except Exception as e:
+        logger.error(f"Error setting up indexes: {str(e)}")
+        raise
+    
+import secrets
+def generate_secret_key():
+    return secrets.token_hex(32)
+
+def create_app():
+    global users_collection, sessions_collection, messages_collection, client, logger
+    
+    # Create Flask application
+    app = Flask(__name__)
+    app.secret_key = os.getenv('FLASK_SECRET_KEY', generate_secret_key())
+    
+    # Clean up old session files
+    session_dir = os.path.join(os.getcwd(), 'flask_session')
+    if os.path.exists(session_dir):
+        import shutil
+        shutil.rmtree(session_dir)
+    
+    # Set session configuration to expire after server restart
+    app.config['SESSION_TYPE'] = 'filesystem'  # Use file system to store sessions
+    app.config['SESSION_FILE_DIR'] = session_dir  # Session file storage directory
+    app.config['SESSION_PERMANENT'] = False  # Sessions are not permanent
+    app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=1)  # Session lasts for 1 hour
+    app.config['SESSION_USE_SIGNER'] = True  # Use signer to protect session data
+    app.config['SESSION_KEY_PREFIX'] = 'mathmentor_'  # Session key prefix
+    
+    # Ensure session directory exists
+    os.makedirs(session_dir, exist_ok=True)
+    
+    # Initialize session extension
+    from flask_session import Session
+    Session(app)
+
+    # Set logging level
+    logging.basicConfig(level=logging.WARNING)
+    logger = logging.getLogger(__name__)
+
+    # Set MongoDB and httpx logging level
+    pymongo_logger = logging.getLogger('pymongo')
+    pymongo_logger.setLevel(logging.WARNING)
+
+    httpx_logger = logging.getLogger('httpx')
+    httpx_logger.setLevel(logging.WARNING)
+
+    # Load environment variables
+    load_dotenv()
+
+    # OpenAI API settings
+    client = OpenAI(
+        api_key=os.getenv('OPENAI_API_KEY'),
+        base_url=os.getenv('OPENAI_BASE_URL')
+    )
+    
+    # Create blueprints
+    from routes.auth import create_auth_routes
+    from routes.chat import create_chat_routes
+    
+    # 获取或创建reset_tokens集合
+    reset_tokens_collection = users_collection.database.get_collection('reset_tokens')
+    
+    auth_bp = create_auth_routes(users_collection, gmt8, reset_tokens_collection)
+    chat_bp = create_chat_routes(sessions_collection, messages_collection, client, gmt8, load_system_message)
+    
+    # Register blueprints
+    app.register_blueprint(auth_bp)
+    app.register_blueprint(chat_bp)
+    app.register_blueprint(admin_bp)
+    
+    # 添加404错误处理器
+    @app.errorhandler(404)
+    def page_not_found(e):
+        return render_template('404.html'), 404
+    
+    # 添加500错误处理器
+    @app.errorhandler(500)
+    def internal_server_error(e):
+        logger.error(f"500 error: {str(e)}")
+        return render_template('500.html'), 500
+    
+    # Protected home route
+    @app.route('/')
+    @login_required
+    def index():
+        return render_template('index.html')
+    
+    return app
+
+if __name__ == '__main__':
+    app = create_app()
+    setup_indexes()
+    app.run(debug=True, threaded=False, use_reloader=True, host='0.0.0.0')

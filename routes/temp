@@ -1,0 +1,1069 @@
+from flask import jsonify, request, session
+from datetime import datetime
+import logging
+
+logger = logging.getLogger(__name__)
+
+
+def create_chat_routes(sessions_collection, messages_collection, client, gmt8,
+                       load_system_message):
+    from routes import create_chat_blueprint
+    chat_bp = create_chat_blueprint()
+
+    @chat_bp.route('/api/chat', methods=['POST'])
+    def chat():
+        data = request.get_json()
+        user_input = data.get('message')
+        session_id = data.get('session_id', 'default')
+        current_time = datetime.now(gmt8)
+
+        if not user_input:
+            logger.warning("No message provided in /api/chat")
+            return jsonify({"error": "No message provided"}), 400
+
+        # Get session information
+        session_data = sessions_collection.find_one({"session_id": session_id})
+        if not session_data:
+            return jsonify({"error": "Session not found"}), 404
+
+        # Get session history messages
+        messages = list(
+            messages_collection.find({
+                "session_id": session_id
+            }, {
+                "_id": 0,
+                "role": 1,
+                "content": 1
+            }).sort("sequence", 1))
+
+        # Add user message
+        next_sequence = session_data.get("message_count", 0) + 1
+        user_message = {
+            "message_id": f"{session_id}_{next_sequence}",
+            "session_id": session_id,
+            "role": "user",
+            "content": user_input,
+            "created_at": current_time,
+            "sequence": next_sequence
+        }
+        messages_collection.insert_one(user_message)
+
+        try:
+            # Send to GPT for processing
+            completion = client.chat.completions.create(
+                model="gpt-4o",
+                messages=messages + [{
+                    "role": "user",
+                    "content": user_input
+                }],
+                stream=False)
+
+            assistant_message = completion.choices[0].message.content
+            next_sequence += 1
+
+            # Save assistant reply
+            messages_collection.insert_one({
+                "message_id": f"{session_id}_{next_sequence}",
+                "session_id": session_id,
+                "role": "assistant",
+                "content": assistant_message,
+                "created_at": current_time,
+                "sequence": next_sequence
+            })
+
+            # Update session information
+            sessions_collection.update_one({"session_id": session_id}, {
+                "$set": {
+                    "updated_at": current_time,
+                    "message_count": next_sequence
+                }
+            })
+
+            return jsonify({
+                "response": assistant_message,
+                "session_id": session_id
+            })
+
+        except Exception as e:
+            logger.error(f"Error in /api/chat: {str(e)}")
+            return jsonify({"error": f"Chat completion failed: {str(e)}"}), 500
+
+    @chat_bp.route('/api/history', methods=['GET'])
+    def get_history():
+        session_id = request.args.get('session_id', 'default')
+        messages = list(
+            messages_collection.find({
+                "session_id": session_id
+            }, {
+                "_id": 0,
+                "role": 1,
+                "content": 1,
+                "created_at": 1
+            }).sort("sequence", 1))
+
+        if messages:
+            return jsonify(messages)
+        return jsonify([])
+
+    @chat_bp.route('/api/sessions')
+    def get_sessions():
+        if 'user_id' not in session:
+            return jsonify({"error": "Not logged in"}), 401
+
+        user_id = session['user_id']
+
+        sessions = list(
+            sessions_collection.find({
+                "user_id": user_id
+            }, {
+                "_id": 0,
+                "session_id": 1,
+                "title": 1,
+                "created_at": 1,
+                "updated_at": 1,
+                "message_count": 1
+            }).sort("updated_at", -1))
+
+        return jsonify(sessions)
+
+    @chat_bp.route('/api/new-session', methods=['POST'])
+    def create_session():
+        if 'user_id' not in session:
+            return jsonify({"error": "Not logged in"}), 401
+
+        data = request.get_json()
+        current_time = datetime.now(gmt8)
+        session_id = data.get('session_id', f'chat_{current_time.timestamp()}')
+
+        # 格式化当前时间为YYYYMMDD-HH:MI格式
+        formatted_time = current_time.strftime("%Y%m%d-%H:%M")
+        default_title = f"Chat {formatted_time}"
+
+        try:
+            # Create new session
+            new_session = {
+                "session_id": session_id,
+                "user_id": session['user_id'],
+                "title": default_title,  # 使用YYYYMMDD-HH:MI格式作为默认标题
+                "created_at": current_time,
+                "updated_at": current_time,
+                "message_count": 2  # 系统消息和欢迎消息
+            }
+            sessions_collection.insert_one(new_session)
+
+            # 添加系统消息 (序列号为1)
+            system_message = load_system_message()
+            messages_collection.insert_one({
+                "message_id": f"{session_id}_1",
+                "session_id": session_id,
+                "role": "system",
+                "content": system_message["content"],
+                "created_at": current_time,
+                "sequence": 1
+            })
+
+            # 添加欢迎消息 (序列号为2)
+            messages_collection.insert_one({
+                "message_id": f"{session_id}_2",
+                "session_id": session_id,
+                "role": "assistant",
+                "content":
+                "Hi! I'm MathMentor, your virtual math assistant. What can I help you with today?",
+                "created_at": current_time,
+                "sequence": 2
+            })
+
+            return jsonify({"success": True, "session_id": session_id})
+        except Exception as e:
+            logger.error(f"Error creating new session: {str(e)}")
+            return jsonify({"error": str(e)}), 500
+
+    @chat_bp.route('/api/delete-session', methods=['POST'])
+    def delete_session():
+        data = request.get_json()
+        session_id = data.get('session_id')
+
+        if not session_id:
+            return jsonify({"error": "Session ID is required"}), 400
+
+        try:
+            # Delete session and its messages
+            sessions_collection.delete_one({"session_id": session_id})
+            messages_collection.delete_many({"session_id": session_id})
+            return jsonify({"success": True})
+        except Exception as e:
+            logger.error(f"Error deleting session: {str(e)}")
+            return jsonify({"error": str(e)}), 500
+
+    @chat_bp.route('/api/update-title', methods=['POST'])
+    def update_title():
+        data = request.get_json()
+        session_id = data.get('session_id')
+        new_title = data.get('title')
+
+        if not all([session_id, new_title]):
+            return jsonify({"error": "Session ID and title are required"}), 400
+
+        try:
+            sessions_collection.update_one({"session_id": session_id},
+                                           {"$set": {
+                                               "title": new_title
+                                           }})
+            return jsonify({"success": True})
+        except Exception as e:
+            logger.error(f"Error updating title: {str(e)}")
+            return jsonify({"error": str(e)}), 500
+
+    return chat_bp
+
+
+
+
+html
+
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MathMentor Chatbot</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <!-- MathJax for LaTeX rendering -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/js-polyfills/0.1.43/polyfill.min.js"></script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <style>
+         /* User menu styles */
+        .user-menu {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            z-index: 1000;
+        }
+
+        .user-menu-button {
+            background: #2196F3;
+            color: white;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 5px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .user-menu-content {
+            display: none;
+            position: absolute;
+            right: 0;
+            top: 100%;
+            background: white;
+            border-radius: 5px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            min-width: 200px;
+            margin-top: 0.5rem;
+        }
+
+        .user-menu.active .user-menu-content {
+            display: block;
+        }
+
+        .user-menu-item {
+            padding: 0.75rem 1rem;
+            color: #333;
+            text-decoration: none;
+            display: block;
+            transition: background 0.3s;
+        }
+
+        .user-menu-item:hover {
+            background: #f5f5f5;
+        }
+
+        .user-menu-item.logout {
+            color: #f44336;
+            border-top: 1px solid #eee;
+        }
+
+        /* Personal information dialog */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 2000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: white;
+            padding: 2rem;
+            border-radius: 10px;
+            width: 90%;
+            max-width: 500px;
+            position: relative;
+        }
+
+        .modal-close {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            color: #666;
+        }
+
+        .profile-form {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .profile-form .form-group {
+            margin-bottom: 1rem;
+        }
+
+        .profile-form label {
+            display: block;
+            margin-bottom: 0.5rem;
+            color: #333;
+        }
+
+        .profile-form input {
+            width: 100%;
+            padding: 0.8rem;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 1rem;
+        }
+
+        .profile-form button {
+            background: #2196F3;
+            color: white;
+            border: none;
+            padding: 1rem;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 1rem;
+        }
+
+        .profile-form button:hover {
+            background: #1976D2;
+        }
+
+        .chat-list {
+            padding: 10px;
+            overflow-y: auto;
+            max-height: calc(100vh - 120px);
+        }
+
+        .chat-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px 15px;
+            margin: 5px 0;
+            border-radius: 8px;
+            background-color: #f8f9fa;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            /* position: relative; */
+        }
+
+        .chat-item:hover {
+            background-color: #e9ecef;
+            transform: translateX(5px);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .chat-item.active {
+            background-color: #e3e6f0;
+            border-left: 4px solid #4e73df;
+        }
+
+        .chat-title {
+            flex-grow: 1;
+            margin-right: 10px;
+            color: #2c3e50;
+            font-size: 14px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            padding: 2px 5px;
+            border-radius: 4px;
+            transition: all 0.3s ease;
+        }
+
+        .chat-title.editing {
+            background: white;
+            border: 1px solid #4e73df;
+            outline: none;
+            padding: 2px 5px;
+            white-space: nowrap;
+            overflow: hidden;
+        }
+
+        .chat-actions {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .chat-item:hover .chat-actions {
+            opacity: 1;
+        }
+
+        .more-btn {
+            background: none;
+            border: none;
+            color: #666;
+            cursor: pointer;
+            padding: 5px;
+            font-size: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .more-menu {
+            position: absolute;
+            right: 40px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 5px 10px rgba(0,0,0,0.1);
+            display: none;
+            z-index: 1000;
+        }
+
+        .more-menu.active {
+            display: block;
+        }
+
+        .more-menu-item {
+            padding: 8px 15px;
+            color: #333;
+            font-size: 14px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            white-space: nowrap;
+        }
+
+        .more-menu-item:hover {
+            background: #f5f5f5;
+            border-radius: 10px;
+        }
+
+        .more-menu-item.delete {
+            color: #dc3545;
+        }
+    </style>
+</head>
+<body>
+    <!-- User menu -->
+    <div class="user-menu" id="userMenu">
+        <button class="user-menu-button" onclick="toggleUserMenu()">
+            <span>{{ session.get('username', 'User') }}</span>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M6 9L12 15L18 9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+        </button>
+        <div class="user-menu-content">
+            <a href="#" class="user-menu-item" onclick="showProfile()">Profile</a>
+            <a href="#" class="user-menu-item" onclick="showChangePassword()">Change Password</a>
+            <a href="/api/logout" class="user-menu-item logout">Logout</a>
+        </div>
+    </div>
+
+    <!-- Personal information dialog -->
+    <div class="modal" id="profileModal">
+        <div class="modal-content">
+            <button class="modal-close" onclick="closeModal('profileModal')">&times;</button>
+            <h2>Profile</h2>
+            <form class="profile-form" onsubmit="updateProfile(event)">
+                <div class="form-group">
+                    <label for="profileUsername">Username</label>
+                    <input type="text" id="profileUsername" value="{{ session.get('username', '') }}" required>
+                </div>
+                <div class="form-group">
+                    <label for="profileEmail">Email</label>
+                    <input type="email" id="profileEmail" value="{{ session.get('email', '') }}" required>
+                </div>
+                <button type="submit">Save Changes</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modify password dialog -->
+    <div class="modal" id="passwordModal">
+        <div class="modal-content">
+            <button class="modal-close" onclick="closeModal('passwordModal')">&times;</button>
+            <h2>Change Password</h2>
+            <form class="profile-form" onsubmit="changePassword(event)">
+                <div class="form-group">
+                    <label for="currentPassword">Current Password</label>
+                    <input type="password" id="currentPassword" required>
+                </div>
+                <div class="form-group">
+                    <label for="newPassword">New Password</label>
+                    <input type="password" id="newPassword" required>
+                </div>
+                <div class="form-group">
+                    <label for="confirmNewPassword">Confirm New Password</label>
+                    <input type="password" id="confirmNewPassword" required>
+                </div>
+                <button type="submit">Change Password</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Sidebar chat history -->
+    <div class="sidebar" id="chatHistory">
+        <button class="new-chat-btn" onclick="createNewChat()">
+            <span>+ New Chat</span>
+        </button>
+        <div id="chat-list"></div>
+    </div>
+
+    <!-- Main chat container -->
+    <div class="chat-container">
+        <div class="chat-header">
+            <span>MathMentor</span>
+        </div>
+        <div class="chat-messages" id="chatMessages">
+            <div class="welcome-container" style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 60vh;">
+                <h1 style="font-size: 2.5rem; margin-bottom: 1rem;">What can I help with?</h1>
+                <p style="color: #666; font-size: 1.1rem;">Ask anything about math...</p>
+            </div>
+        </div>
+        <div class="chat-input-container">
+            <div class="chat-input">
+                <textarea id="messageInput" placeholder="Enter your question..." rows="1" onkeydown="handleKeyDown(event)"></textarea>
+                <button class="send-button" onclick="sendMessage()">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M22 2L11 13" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
+                        <path d="M22 2L15 22L11 13L2 9L22 2Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
+                    </svg>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentChatId = null;  // Change to null, indicating no active conversation
+
+        // Automatically adjust the height of the text area
+        const messageInput = document.getElementById('messageInput');
+        messageInput.addEventListener('input', function() {
+            this.style.height = 'auto';
+            this.style.height = (this.scrollHeight) + 'px';
+        });
+
+        // Handle the Enter key to send a message
+        function handleKeyDown(event) {
+            if (event.key === 'Enter' && !event.shiftKey) {
+                event.preventDefault();
+                sendMessage();
+            }
+        }
+
+        // Load chat sessions to the sidebar
+        function loadChatSessions() {
+            fetch('/api/sessions')
+                .then(response => {
+                    if (!response.ok) throw new Error(`Failed to get sessions: ${response.status}`);
+                    return response.json();
+                })
+                .then(sessions => {
+                    const chatList = document.getElementById('chat-list');
+                    chatList.innerHTML = '';
+                    
+                    sessions.forEach(session => {
+                        const itemDiv = document.createElement('div');
+                        itemDiv.className = `chat-item ${session.session_id === currentChatId ? 'active' : ''}`;
+                        itemDiv.setAttribute('data-session-id', session.session_id);
+                        
+                        const titleSpan = document.createElement('span');
+                        titleSpan.className = 'chat-title';
+                        titleSpan.textContent = session.title || `Chat - ${new Date(session.updated_at).toLocaleDateString()}`;
+                        
+                        const actionsDiv = document.createElement('div');
+                        actionsDiv.className = 'chat-actions';
+                        
+                        const moreBtn = document.createElement('button');
+                        moreBtn.className = 'more-btn';
+                        moreBtn.innerHTML = `
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <circle cx="12" cy="6" r="2" fill="currentColor"/>
+                                <circle cx="12" cy="12" r="2" fill="currentColor"/>
+                                <circle cx="12" cy="18" r="2" fill="currentColor"/>
+                            </svg>
+                        `;
+                        
+                        const moreMenu = document.createElement('div');
+                        moreMenu.className = 'more-menu';
+                        moreMenu.innerHTML = `
+                            <div class="more-menu-item" onclick="startEditTitle(event, '${session.session_id}')">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                </svg>
+                                Edit
+                            </div>
+                            <div class="more-menu-item delete" onclick="deleteChat('${session.session_id}')">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                    <path d="M3 6h18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                </svg>
+                                Delete
+                            </div>
+                        `;
+                        
+                        moreBtn.onclick = (e) => {
+                            e.stopPropagation();
+                            document.querySelectorAll('.more-menu.active').forEach(menu => {
+                                if (menu !== moreMenu) {
+                                    menu.classList.remove('active');
+                                }
+                            });
+                            moreMenu.classList.toggle('active');
+                        };
+                        
+                        // 添加鼠标移出事件处理程序
+                        itemDiv.addEventListener('mouseleave', function() {
+                            // 当鼠标移出聊天项时，关闭菜单
+                            moreMenu.classList.remove('active');
+                        });
+                        
+                        actionsDiv.appendChild(moreBtn);
+                        actionsDiv.appendChild(moreMenu);
+                        
+                        itemDiv.appendChild(titleSpan);
+                        itemDiv.appendChild(actionsDiv);
+                        
+                        itemDiv.addEventListener('click', function(e) {
+                            if (e.target.closest('.more-btn') || e.target.closest('.more-menu')) {
+                                return;
+                            }
+                            
+                            document.querySelectorAll('.more-menu.active').forEach(menu => {
+                                menu.classList.remove('active');
+                            });
+                            
+                            loadChat(session.session_id);
+                        });
+                        
+                        chatList.appendChild(itemDiv);
+                    });
+                })
+                .catch(error => {
+                    console.error('Failed to load chat sessions:', error);
+                    alert('Failed to load chat sessions: ' + error.message);
+                });
+        }
+
+        // Load specific chat messages
+        function loadChat(sessionId) {
+            currentChatId = sessionId;
+            
+            // 设置活动状态
+            document.querySelectorAll('.chat-item').forEach(item => {
+                item.classList.remove('active');
+            });
+            const activeItem = document.querySelector(`.chat-item[data-session-id="${sessionId}"]`);
+            if (activeItem) {
+                activeItem.classList.add('active');
+            }
+            
+            fetch(`/api/history?session_id=${sessionId}`)
+                .then(response => {
+                    if (!response.ok) throw new Error(`Failed to get history: ${response.status}`);
+                    return response.json();
+                })
+                .then(messages => {
+                    const chatMessages = document.getElementById('chatMessages');
+                    chatMessages.innerHTML = '';
+                    
+                    messages.forEach(msg => {
+                        if (msg.role !== 'system') {
+                            addMessage(msg.content, msg.role === 'user');
+                        }
+                    });
+                })
+                .catch(error => {
+                    console.error('Failed to load history:', error);
+                    addMessage('Error: ' + error.message, false);
+                });
+        }
+
+        // Add message to chat UI and render MathJax
+        function addMessage(content, isUser) {
+            const chatMessages = document.getElementById('chatMessages');
+            
+            const wrapperDiv = document.createElement('div');
+            wrapperDiv.className = `message-wrapper ${isUser ? 'user-message-wrapper' : 'bot-message-wrapper'}`;
+            
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${isUser ? 'user-message' : 'bot-message'}`;
+            messageDiv.innerHTML = content;
+            
+            wrapperDiv.appendChild(messageDiv);
+            chatMessages.appendChild(wrapperDiv);
+            
+            // Automatically scroll to the bottom
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+
+            // Render LaTeX with MathJax
+            MathJax.typesetPromise([messageDiv]).catch(err => {
+                console.error('MathJax error:', err);
+                messageDiv.innerHTML = content.replace(/<\/?math>/g, '');
+            });
+        }
+
+        // Send message
+        async function sendMessage() {
+            const input = document.getElementById('messageInput');
+            const message = input.value.trim();
+            if (!message) return;
+
+            // If it's the first message, create a new session first
+            if (!currentChatId) {
+                try {
+                    const response = await fetch('/api/new-session', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({})
+                    });
+                    
+                    if (!response.ok) throw new Error('Failed to create new session');
+                    
+                    const data = await response.json();
+                    if (data.success) {
+                        currentChatId = data.session_id;
+                        // Clear welcome information
+                        document.getElementById('chatMessages').innerHTML = '';
+                    } else {
+                        throw new Error(data.error || 'Failed to create session');
+                    }
+                } catch (error) {
+                    console.error('Failed to create new chat:', error);
+                    addMessage('Error: Unable to create new chat.', false);
+                    return;
+                }
+            }
+
+            addMessage(message, true);
+            input.value = '';
+            input.style.height = 'auto';
+
+            // Show the typing indicator
+            const typingWrapper = document.createElement('div');
+            typingWrapper.className = 'message-wrapper bot-message-wrapper';
+            typingWrapper.id = 'typing-indicator';
+            
+            const typingDiv = document.createElement('div');
+            typingDiv.className = 'message bot-message';
+            typingDiv.innerHTML = '<p>Thinking...</p>';
+            
+            typingWrapper.appendChild(typingDiv);
+            document.getElementById('chatMessages').appendChild(typingWrapper);
+            
+            try {
+                const response = await fetch('/api/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        message: message, 
+                        session_id: currentChatId 
+                    })
+                });
+
+                if (!response.ok) throw new Error(`Failed to send message: ${response.status}`);
+                const data = await response.json();
+                
+                // Remove the input indicator
+                const indicator = document.getElementById('typing-indicator');
+                if (indicator) indicator.remove();
+                
+                if (data.response) {
+                    addMessage(data.response, false);
+                    loadChatSessions();  // Update the session list to show the latest status
+                } else {
+                    addMessage('Error: ' + data.error, false);
+                }
+            } catch (error) {
+                // Remove the input indicator
+                const indicator = document.getElementById('typing-indicator');
+                if (indicator) indicator.remove();
+                
+                console.error('Failed to send message:', error);
+                addMessage('Error: Unable to connect to the server.', false);
+            }
+        }
+
+        // Create a new chat session
+        function createNewChat() {
+            currentChatId = 'chat_' + Date.now();
+            fetch('/api/new-session', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ session_id: currentChatId })
+            })
+                .then(response => {
+                    if (!response.ok) throw new Error(`Failed to create session: ${response.status}`);
+                    return response.json();
+                })
+                .then(data => {
+                    if (data.success) {
+                        loadChatSessions();
+                        loadChat(currentChatId);
+                    } else {
+                        addMessage('错误: ' + data.error, false);
+                    }
+                })
+                .catch(error => {
+                    console.error('Failed to create new chat:', error);
+                    addMessage('Failed to create new chat.', false);
+                });
+        }
+
+        // Delete chat session
+        function deleteChat(sessionId) {
+            if (confirm(`Are you sure you want to delete this chat?`)) {
+                fetch('/api/delete-session', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ session_id: sessionId })
+                })
+                .then(response => {
+                    if (!response.ok) throw new Error(`Failed to delete session: ${response.status}`);
+                    return response.json();
+                })
+                .then(data => {
+                    if (data.success) {
+                        loadChatSessions();
+                        if (currentChatId === sessionId) {
+                            // Reset the current session ID
+                            currentChatId = null;
+                            // Show the welcome interface
+                            const chatMessages = document.getElementById('chatMessages');
+                            chatMessages.innerHTML = `
+                                <div class="welcome-container" style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 60vh;">
+                                    <h1 style="font-size: 2.5rem; margin-bottom: 1rem;">What can I help with?</h1>
+                                    <p style="color: #666; font-size: 1.1rem;">Ask anything about math...</p>
+                                </div>
+                            `;
+                        }
+                    } else {
+                        addMessage('Error: ' + data.error, false);
+                    }
+                })
+                .catch(error => {
+                    console.error('Failed to delete chat:', error);
+                    addMessage('Failed to delete chat.', false);
+                });
+            }
+        }
+
+        // Toggle mobile sidebar
+        function toggleSidebar() {
+            document.querySelector('.sidebar').classList.toggle('open');
+        }
+
+        // Initialize when page loads
+        window.onload = () => {
+            loadChatSessions();
+        };
+
+        // User menu related functions
+        function toggleUserMenu() {
+            document.getElementById('userMenu').classList.toggle('active');
+        }
+
+        // Click other places to close the user menu
+        document.addEventListener('click', function(event) {
+            const userMenu = document.getElementById('userMenu');
+            if (!userMenu.contains(event.target)) {
+                userMenu.classList.remove('active');
+            }
+        });
+
+        function showProfile() {
+            document.getElementById('profileModal').classList.add('active');
+            document.getElementById('userMenu').classList.remove('active');
+        }
+
+        function showChangePassword() {
+            document.getElementById('passwordModal').classList.add('active');
+            document.getElementById('userMenu').classList.remove('active');
+        }
+
+        function closeModal(modalId) {
+            document.getElementById(modalId).classList.remove('active');
+        }
+
+        async function updateProfile(event) {
+            event.preventDefault();
+            const username = document.getElementById('profileUsername').value;
+            const email = document.getElementById('profileEmail').value;
+
+            try {
+                const response = await fetch('/api/update-profile', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, email })
+                });
+
+                const data = await response.json();
+                
+                if (response.ok) {
+                    alert('Personal information updated successfully');
+                    closeModal('profileModal');
+                    // Update the displayed username
+                    document.querySelector('.user-menu-button span').textContent = username;
+                } else {
+                    alert(data.error || 'Update failed');
+                }
+            } catch (error) {
+                alert('Network error, please try again later');
+            }
+        }
+
+        async function changePassword(event) {
+            event.preventDefault();
+            const currentPassword = document.getElementById('currentPassword').value;
+            const newPassword = document.getElementById('newPassword').value;
+            const confirmNewPassword = document.getElementById('confirmNewPassword').value;
+
+            if (newPassword !== confirmNewPassword) {
+                alert('The new password you entered does not match');
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/change-password', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        current_password: currentPassword,
+                        new_password: newPassword
+                    })
+                });
+
+                const data = await response.json();
+                
+                if (response.ok) {
+                    alert('Password changed successfully');
+                    closeModal('passwordModal');
+                    event.target.reset();
+                } else {
+                    alert(data.error || 'Password change failed');
+                }
+            } catch (error) {
+                alert('Network error, please try again later');
+            }
+        }
+
+        // Modify the edit title function
+        async function editTitle(sessionId, newTitle) {
+            try {
+                const response = await fetch('/api/update-title', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        session_id: sessionId,
+                        title: newTitle
+                    })
+                });
+
+                if (!response.ok) throw new Error('Failed to update title');
+                
+                const data = await response.json();
+                if (!data.success) {
+                    throw new Error(data.error || 'Failed to update title');
+                }
+                
+                loadChatSessions();  // Reload the session list
+            } catch (error) {
+                console.error('Failed to update title:', error);
+                loadChatSessions();  // Reload the session list when an error occurs to restore the original title
+            }
+        }
+
+        // Add a new edit title function
+        function startEditTitle(event, sessionId) {
+            event.stopPropagation();
+            const chatItem = document.querySelector(`.chat-item[data-session-id="${sessionId}"]`);
+            const titleSpan = chatItem.querySelector('.chat-title');
+            
+            // Save the original text
+            titleSpan.setAttribute('data-original', titleSpan.textContent);
+            
+            // Make the title editable
+            titleSpan.contentEditable = true;
+            titleSpan.classList.add('editing');
+            titleSpan.focus();
+            
+            // Close the more menu
+            document.querySelectorAll('.more-menu.active').forEach(menu => {
+                menu.classList.remove('active');
+            });
+            
+            // Add a one-time event listener
+            function handleBlur() {
+                titleSpan.contentEditable = false;
+                titleSpan.classList.remove('editing');
+                const newTitle = titleSpan.textContent.trim();
+                const originalTitle = titleSpan.getAttribute('data-original');
+                
+                if (newTitle !== originalTitle && newTitle !== '') {
+                    editTitle(sessionId, newTitle);
+                } else {
+                    titleSpan.textContent = originalTitle;
+                }
+                
+                titleSpan.removeEventListener('blur', handleBlur);
+                titleSpan.removeEventListener('keydown', handleKeyDown);
+            }
+            
+            function handleKeyDown(e) {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    titleSpan.blur();
+                } else if (e.key === 'Escape') {
+                    e.preventDefault();
+                    titleSpan.textContent = titleSpan.getAttribute('data-original');
+                    titleSpan.blur();
+                }
+            }
+            
+            titleSpan.addEventListener('blur', handleBlur);
+            titleSpan.addEventListener('keydown', handleKeyDown);
+        }
+
+        document.addEventListener('click', function(event) {
+            if (!event.target.closest('.more-btn')) {
+                document.querySelectorAll('.more-menu.active').forEach(menu => {
+                    menu.classList.remove('active');
+                });
+            }
+        });
+    </script>
+</body>
+</html>

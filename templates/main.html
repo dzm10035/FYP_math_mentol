@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MathMentor - Home</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        .hero {
+            text-align: center;
+            padding: 50px 20px;
+            background-color: #f8f9fa;
+        }
+        .features {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 30px;
+            padding: 40px 20px;
+        }
+        .feature-card {
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+        .cta-button {
+            display: inline-block;
+            padding: 12px 24px;
+            background-color: #007bff;
+            color: white;
+            text-decoration: none;
+            border-radius: 5px;
+            margin-top: 20px;
+        }
+        .cta-button:hover {
+            background-color: #0056b3;
+        }
+    </style>
+</head>
+<body>
+    <div class="hero">
+        <h1>Welcome to MathMentor</h1>
+        <p>Your personalized math learning assistant</p>
+        <a href="/chat" class="cta-button">Start learning</a>
+    </div>
+
+    <div class="features">
+        <div class="feature-card">
+            <h3>Step-by-step explanation</h3>
+            <p>Break down complex math problems into clear steps, with detailed explanations and explanations for each step. From basic concepts to advanced applications, we will provide a complete thought process guide to help you truly master the problem-solving methods.</p>
+        </div>
+        <div class="feature-card">
+            <h3>Real-time interaction</h3>
+            <p>Have a question that you don't understand? Ask anytime! Our system will respond immediately, providing professional answers and guidance. Whether it's homework or exam preparation, you can get timely help.</p>
+        </div>
+        <div class="feature-card">
+            <h3>Personalized learning</h3>
+            <p>Each student is unique. Our system will adjust the explanation and difficulty based on your learning level, understanding speed, and mastery. Make learning more targeted and effective.</p>
+        </div>
+    </div>
+</body>
+</html>
+
+
+
+
+
+
