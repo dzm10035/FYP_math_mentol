@@ -8,6 +8,7 @@ from dotenv import load_dotenv
 import os
 from functools import wraps
 from routes.admin import admin_bp
+from routes.upload import create_upload_routes
 from database import users_collection, sessions_collection, messages_collection
 
 # Load environment variables first
@@ -116,29 +117,31 @@ def create_app():
     from routes.auth import create_auth_routes
     from routes.chat import create_chat_routes
     
-    # 获取或创建reset_tokens集合
+    # get or create reset_tokens collection
     reset_tokens_collection = users_collection.database.get_collection('reset_tokens')
     
     auth_bp = create_auth_routes(users_collection, gmt8, reset_tokens_collection)
     chat_bp = create_chat_routes(sessions_collection, messages_collection, client, gmt8, load_system_message)
+    upload_bp = create_upload_routes()
     
     # Register blueprints
     app.register_blueprint(auth_bp)
     app.register_blueprint(chat_bp)
     app.register_blueprint(admin_bp)
+    app.register_blueprint(upload_bp)
     
-    # 添加404错误处理器
+    # add 404 error handler
     @app.errorhandler(404)
     def page_not_found(e):
         return render_template('404.html'), 404
     
-    # 添加500错误处理器
+    # add 500 error handler
     @app.errorhandler(500)
     def internal_server_error(e):
         logger.error(f"500 error: {str(e)}")
         return render_template('500.html'), 500
     
-    # Protected home route
+    # protected home route
     @app.route('/')
     @login_required
     def index():

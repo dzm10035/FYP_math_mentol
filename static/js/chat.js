@@ -5,12 +5,16 @@ const chatMessages = document.getElementById('chatMessages');
 const messageInput = document.getElementById('messageInput');
 const sendButton = document.querySelector('.send-button');
 const newChatButton = document.querySelector('.new-chat-btn');
+const headerNewChatBtn = document.getElementById('headerNewChatBtn');
 const chatList = document.getElementById('chat-list');
 
 // Main initialization
 document.addEventListener('DOMContentLoaded', async () => {
+    // 初始化侧边栏切换按钮
+    initSidebarToggle();
+    
     // Ensure all DOM elements are loaded
-    if (!chatMessages || !messageInput || !sendButton || !newChatButton || !chatList) {
+    if (!chatMessages || !messageInput || !sendButton || !chatList) {
         console.error('Unable to find required DOM elements');
         return;
     }
@@ -32,6 +36,37 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 });
 
+// 初始化侧边栏切换功能
+function initSidebarToggle() {
+    console.log('Initializing sidebar toggle...');
+    const sidebarToggle = document.getElementById('sidebarToggle');
+    const sidebar = document.getElementById('chatHistory');
+    
+    if (!sidebarToggle) {
+        console.error('Sidebar toggle button not found');
+        return;
+    }
+    
+    if (!sidebar) {
+        console.error('Sidebar element not found');
+        return;
+    }
+    
+    console.log('Adding click event to sidebar toggle button');
+    sidebarToggle.addEventListener('click', function(e) {
+        console.log('Sidebar toggle clicked');
+        sidebar.classList.toggle('collapsed');
+        document.body.classList.toggle('sidebar-collapsed');
+        
+        // 打印当前状态以便调试
+        console.log('Sidebar collapsed:', sidebar.classList.contains('collapsed'));
+        console.log('Body sidebar-collapsed:', document.body.classList.contains('sidebar-collapsed'));
+        
+        e.preventDefault();
+        e.stopPropagation();
+    });
+}
+
 // Set up event listeners
 function setupEventListeners() {
     // Send message
@@ -43,8 +78,14 @@ function setupEventListeners() {
         }
     });
 
-    // New chat
-    newChatButton.addEventListener('click', handleNewChat);
+    // New chat buttons
+    if (headerNewChatBtn) {
+        headerNewChatBtn.addEventListener('click', handleNewChat);
+    }
+    
+    if (newChatButton) {
+        newChatButton.addEventListener('click', handleNewChat);
+    }
 
     // User menu
     document.querySelector('.user-menu-button').addEventListener('click', toggleUserMenu);
@@ -197,6 +238,14 @@ async function handleLoadChat(sessionId) {
                 addMessage(msg.content, msg.role === 'user');
             }
         });
+        
+        // 滚动到合适的位置，留出底部空间
+        const chatContainer = document.querySelector('.chat-container');
+        if (chatContainer) {
+            // 计算一个合适的滚动位置，留出一些底部空间
+            const scrollTarget = chatContainer.scrollHeight - chatContainer.clientHeight * 0.95;
+            chatContainer.scrollTop = scrollTarget;
+        }
     } catch (error) {
         console.error('Failed to load history:', error);
         addMessage('Error: ' + error.message, false);
@@ -337,14 +386,74 @@ function addMessage(content, isUser) {
     // Process Markdown format
     contentDiv.innerHTML = window.formatMarkdown(content, isUser);
     
+    // 添加图片点击放大功能
+    contentDiv.querySelectorAll('img').forEach(img => {
+        img.addEventListener('click', () => {
+            showImageOverlay(img.src);
+        });
+    });
+    
     messageDiv.appendChild(contentDiv);
     wrapperDiv.appendChild(messageDiv);
     
     const chatMessages = document.getElementById('chatMessages');
     chatMessages.appendChild(wrapperDiv);
     
-    // Automatically scroll to the bottom
-    chatMessages.scrollTop = chatMessages.scrollHeight;
+    // 滚动到合适的位置，减小偏移量
+    const chatContainer = document.querySelector('.chat-container');
+    if (chatContainer) {
+        // 只留出很小的底部空间
+        const scrollTarget = chatContainer.scrollHeight - 100;
+        chatContainer.scrollTop = scrollTarget;
+    }
+}
+
+// 显示图片放大层
+function showImageOverlay(imageSrc) {
+    // 检查是否已存在图片放大层
+    let overlay = document.querySelector('.img-overlay');
+    
+    // 如果不存在，创建一个
+    if (!overlay) {
+        overlay = document.createElement('div');
+        overlay.className = 'img-overlay';
+        
+        const closeBtn = document.createElement('div');
+        closeBtn.className = 'close-overlay';
+        closeBtn.innerHTML = '&times;';
+        closeBtn.addEventListener('click', () => {
+            overlay.classList.remove('active');
+        });
+        
+        const img = document.createElement('img');
+        overlay.appendChild(img);
+        overlay.appendChild(closeBtn);
+        
+        // 点击图片外部区域关闭
+        overlay.addEventListener('click', (e) => {
+            if (e.target === overlay) {
+                overlay.classList.remove('active');
+            }
+        });
+        
+        // 按ESC键关闭
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && overlay.classList.contains('active')) {
+                overlay.classList.remove('active');
+            }
+        });
+        
+        document.body.appendChild(overlay);
+    }
+    
+    // 设置图片源并显示
+    const img = overlay.querySelector('img');
+    img.src = imageSrc;
+    
+    // 显示放大层
+    setTimeout(() => {
+        overlay.classList.add('active');
+    }, 10);
 }
 
 // User menu related functions
@@ -442,3 +551,18 @@ window.closeModal = closeModal;
 window.handleDeleteChat = handleDeleteChat;
 window.startEditTitle = startEditTitle;
 window.addMessage = addMessage;
+window.showImageOverlay = showImageOverlay;
+
+// 切换侧边栏显示/隐藏
+function toggleSidebar() {
+    console.log('toggleSidebar called');
+    const sidebar = document.getElementById('chatHistory');
+    
+    if (sidebar) {
+        sidebar.classList.toggle('collapsed');
+        document.body.classList.toggle('sidebar-collapsed');
+        console.log('Sidebar toggled:', sidebar.classList.contains('collapsed'));
+    } else {
+        console.error('Sidebar element not found when toggling');
+    }
+}

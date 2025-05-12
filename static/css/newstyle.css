@@ -36,8 +36,9 @@ img {
 /* Message styles */
 .message-wrapper {
     width: 100%;
-    padding: 10px 20px;
+    padding: 10px 2px 10px 20px;
     display: flex;
+    box-sizing: border-box;
 }
 
 .user-message-wrapper {
@@ -134,43 +135,88 @@ img {
     height: 100vh;
     overflow-x: hidden;
     min-width: 0;
+    margin-left: 260px;
+    transition: margin-left 0.3s ease;
+    position: relative;
+    width: calc(100% - 260px); /* 宽度为剩余空间 */
+    overflow-y: auto; /* 滚动条移至整个页面最右侧 */
 }
 
+/* 当侧边栏折叠时 */
+body.sidebar-collapsed .chat-container {
+    margin-left: 0 !important;
+    width: 100% !important; /* 侧边栏折叠时占据全部宽度 */
+    transition: margin-left 0.3s ease, width 0.3s ease;
+}
+
+/* 聊天内容包装器，使内容居中 */
+.chat-content-wrapper {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    max-width: 1200px;
+    margin: 0 auto;
+    width: 100%;
+    padding: 0 20px 0 20px; /* 恢复两侧padding */
+    margin-top: 56px; /* 为header留出空间 */
+    overflow: visible; /* 移除hidden限制 */
+    position: relative; /* 确保相对定位 */
+}
+
+.chat-messages {
+    flex: 1;
+    padding: 20px 5px 20px 5px; /* 适当的填充 */
+    background-color: transparent;
+    display: flex;
+    flex-direction: column;
+    margin-bottom: 15px; /* 与输入框保持距离 */
+    box-sizing: border-box;
+    overflow-y: visible; /* 移除独立滚动 */
+}
+
+/* 修改chat-header的位置为fixed，避免滚动 */
 .chat-header {
     padding: 15px 20px;
     background-color: #4a89dc;
     color: white;
     font-weight: 600;
     font-size: 18px;
-}
-
-.chat-messages {
-    flex: 1;
-    padding: 20px 0;
-    overflow-y: auto;
-    background-color: #f0f2f5;
+    position: fixed;
+    top: 0;
+    left: 260px;
+    right: 0;
+    z-index: 10;
     display: flex;
-    flex-direction: column;
+    align-items: center;
+    height: 56px;
+    transition: left 0.3s ease;
 }
 
-/* Input Area */
+/* 输入区域固定在底部 */
 .chat-input-container {
-    padding: 15px;
+    position: sticky;
+    bottom: 0;
+    background-color: #f9f9f9;
+    padding: 15px 0 25px 0;
+    z-index: 5;
+    width: 100%;
+    margin-top: auto;
+}
+
+.chat-input {
+    display: flex;
+    align-items: center;
+    width: 80%;
+    margin: 0 auto;
     background-color: #fff;
-    border-top: 1px solid #ddd;
+    border-radius: 20px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    transition: box-shadow 0.3s ease;
+    padding: 5px 15px;
 }
 
-.chat-input {
-    display: flex;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-}
-
-.chat-input {
-    display: flex;
-    padding: 15px;
-    background-color: #ffffff;
-    border-top: 1px solid #ddd;
+.chat-input:focus-within {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
 }
 
 .chat-input input {
@@ -229,18 +275,22 @@ img {
     background-color: #f0f0f0;
     color: #333;
     padding: 15px;
+    padding-top: 60px;
     height: 100%;
     overflow-y: auto;
     display: flex;
     flex-direction: column;
     border-right: 1px solid #ddd;
-    z-index: 100;
-    position: relative;
+    z-index: 1001;
+    position: fixed;
+    left: 0;
+    top: 0;
+    transition: left 0.3s ease;
 }
 
 .new-chat-btn {
     padding: 10px;
-    margin-bottom: 15px;
+    margin: 60px 0 15px 0;
     background-color: #4a89dc;
     color: white;
     border: none;
@@ -248,6 +298,8 @@ img {
     cursor: pointer;
     text-align: center;
     font-weight: 500;
+    z-index: 101;
+    position: relative;
 }
 
 .new-chat-btn:hover {
@@ -482,7 +534,7 @@ body {
     .sidebar {
         position: fixed;
         left: -260px;
-        z-index: 100;
+        z-index: 1001;
         transition: left 0.3s;
         background-color: #fff;
     }
@@ -491,32 +543,61 @@ body {
         left: 0;
     }
     
-    .mobile-menu-btn {
-        display: block;
-        position: fixed;
-        top: 10px;
-        left: 10px;
-        z-index: 101;
-        background-color: #4a89dc;
-        color: white;
-        border: none;
-        width: 40px;
-        height: 40px;
-        border-radius: 4px;
-        cursor: pointer;
+    .chat-container {
+        margin-left: 0;
+    }
+    
+    .chat-content-wrapper {
+        padding: 0 10px;
+    }
+    
+    .sidebar-toggle {
+        display: flex;
+    }
+    
+    .chat-header {
+        padding-left: 105px;
+    }
+    
+    /* 移动设备上调整顶部New Chat按钮 */
+    .header-new-chat-btn {
+        left: 56px;
+    }
+}
+
+/* 较小屏幕的移动设备 */
+@media (max-width: 480px) {
+    .header-new-chat-btn {
+        left: 56px;
+    }
+    
+    .user-menu {
+        right: 10px;
+    }
+}
+
+/* 移动设备上当侧边栏展开时，隐藏顶部New Chat按钮 */
+@media (max-width: 768px) {
+    body:not(.sidebar-collapsed) .header-new-chat-btn {
+        display: none;
     }
 }
 
 /* User menu styles */
 .user-menu {
     position: fixed;
-    top: 0.5rem;
-    right: 1rem;
-    z-index: 1000;
+    top: 0;
+    right: 0;
+    z-index: 1003;
+    background-color: #4a89dc;
+    padding: 10px 20px;
+    height: 56px;
+    display: flex;
+    align-items: center;
 }
 
 .user-menu-button {
-    background: #2196F3;
+    background: transparent;
     color: white;
     border: none;
     padding: 0.5rem 1rem;
@@ -636,7 +717,6 @@ body {
 /* Scrollbar styles */
 ::-webkit-scrollbar {
     width: 8px;
-    height: 8px;
 }
 
 ::-webkit-scrollbar-track {
@@ -758,4 +838,513 @@ body {
 .error-message {
     background-color: #f8d7da;
     color: #721c24;
+}
+
+/* 聊天工具栏 */
+.chat-toolbar {
+    display: flex;
+    align-items: center;
+    margin-right: 10px;
+}
+
+.upload-button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    background-color: transparent;
+    border: none;
+    border-radius: 50%;
+    cursor: pointer;
+    color: #666;
+    transition: background-color 0.2s, color 0.2s;
+    margin-right: 5px;
+}
+
+.upload-button:hover {
+    background-color: rgba(0, 0, 0, 0.05);
+    color: #3b82f6;
+}
+
+.upload-button:active {
+    background-color: rgba(0, 0, 0, 0.1);
+}
+
+.main-upload-button {
+    background-color: #f0f2f5;
+    color: #3b82f6;
+    transition: transform 0.2s ease, background-color 0.2s;
+}
+
+.main-upload-button:hover {
+    background-color: #e1e5eb;
+    color: #2563eb;
+    transform: scale(1.1);
+}
+
+.main-upload-button:active {
+    transform: scale(0.95);
+}
+
+/* 上传选项菜单 */
+.upload-menu {
+    position: absolute;
+    z-index: 1000;
+    background-color: white;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    border-radius: 8px;
+    overflow: hidden;
+    width: 150px;
+}
+
+.upload-option {
+    display: flex;
+    align-items: center;
+    padding: 10px 15px;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.upload-option:hover {
+    background-color: #f5f7fa;
+}
+
+.upload-option svg {
+    margin-right: 8px;
+}
+
+.upload-option span {
+    font-size: 14px;
+}
+
+.image-option {
+    color: #3b82f6;
+}
+
+.document-option {
+    color: #10b981;
+}
+
+/* 文件预览 */
+.preview-container {
+    margin: 10px 0;
+}
+
+.preview-wrapper {
+    display: flex;
+    justify-content: flex-end;
+}
+
+.preview-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 5px 10px;
+    border-bottom: 1px solid #eee;
+}
+
+.preview-title {
+    font-size: 12px;
+    color: #888;
+}
+
+.preview-close {
+    background: none;
+    border: none;
+    font-size: 16px;
+    color: #888;
+    cursor: pointer;
+    padding: 0 5px;
+}
+
+.preview-close:hover {
+    color: #e74c3c;
+}
+
+.preview-content {
+    padding: 5px;
+}
+
+.preview-image {
+    max-width: 100%;
+    max-height: 300px;
+    border-radius: 8px;
+    display: block;
+}
+
+.document-preview {
+    display: flex;
+    width: 250px;
+}
+
+.document-preview-container {
+    display: flex;
+    align-items: center;
+    padding: 8px 12px;
+    background-color: #fff;
+    border-radius: 8px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    gap: 10px;
+    width: 250px;
+    height: 40px;
+}
+
+.document-icon {
+    width: 24px;
+    height: 24px;
+    min-width: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    color: white;
+    font-weight: bold;
+    font-size: 10px;
+}
+
+/* 附件标签样式 */
+.attachment-label {
+    font-size: 13px;
+    color: #444;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    flex: 1;
+}
+
+/* 图片预览样式 */
+.message-content img {
+    max-width: 100%;
+    max-height: 400px;
+    border-radius: 8px;
+    margin: 10px 0;
+    cursor: pointer;
+    transition: transform 0.2s;
+}
+
+.message-content img:hover {
+    transform: scale(1.01);
+}
+
+/* 图片放大查看 */
+.img-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.8);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 2000;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.3s, visibility 0.3s;
+}
+
+.img-overlay.active {
+    opacity: 1;
+    visibility: visible;
+}
+
+.img-overlay img {
+    max-width: 90%;
+    max-height: 90%;
+    border-radius: 4px;
+}
+
+.img-overlay .close-overlay {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    color: white;
+    font-size: 30px;
+    cursor: pointer;
+}
+
+/* 文件链接样式 */
+.message-content a[href$=".pdf"],
+.message-content a[href$=".doc"],
+.message-content a[href$=".docx"],
+.message-content a[href$=".txt"],
+.message-content a[href$=".xlsx"],
+.message-content a[href$=".xls"] {
+    display: inline-flex;
+    align-items: center;
+    padding: 6px 12px;
+    background-color: #f5f7fa;
+    border-radius: 6px;
+    color: #3b82f6;
+    text-decoration: none;
+    margin: 5px 0;
+    transition: background-color 0.2s;
+}
+
+.message-content a[href$=".pdf"]::before,
+.message-content a[href$=".doc"]::before,
+.message-content a[href$=".docx"]::before,
+.message-content a[href$=".txt"]::before,
+.message-content a[href$=".xlsx"]::before,
+.message-content a[href$=".xls"]::before {
+    content: "📄 ";
+    margin-right: 5px;
+}
+
+.message-content a[href$=".pdf"]:hover,
+.message-content a[href$=".doc"]:hover,
+.message-content a[href$=".docx"]:hover,
+.message-content a[href$=".txt"]:hover,
+.message-content a[href$=".xlsx"]:hover,
+.message-content a[href$=".xls"]:hover {
+    background-color: #e9edf5;
+}
+
+/* 上传进度指示器 */
+.upload-progress {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background-color: #fff;
+    padding: 12px 20px;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    display: flex;
+    align-items: center;
+    z-index: 2000;
+    font-size: 15px;
+    color: #333;
+}
+
+.upload-progress svg {
+    margin-right: 12px;
+    animation: spin 1.5s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* 附件预览区域 */
+.attachments-preview-area {
+    display: flex;
+    width: 80%;
+    margin: 0 auto;
+    flex-wrap: wrap;
+    gap: 10px;
+    padding: 10px;
+    margin-bottom: 10px;
+    background-color: #f8f9fa;
+    border-radius: 8px;
+    border: 1px solid #e9ecef;
+}
+
+/* 图片预览样式 */
+.attachment-preview {
+    position: relative;
+    border-radius: 8px;
+    overflow: hidden;
+    width: 250px;
+}
+
+.image-preview {
+    width: 250px;
+}
+
+.image-preview-container {
+    position: relative;
+    overflow: hidden;
+    border-radius: 8px;
+    background-color: #f8f9fa;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    width: 250px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    padding: 0 8px;
+}
+
+.image-preview-container img {
+    width: 30px;
+    height: 30px;
+    display: block;
+    border-radius: 4px;
+    object-fit: cover;
+    margin-right: 10px;
+}
+
+/* 文档预览样式 */
+.document-preview {
+    display: flex;
+    width: 250px;
+}
+
+.document-preview-container {
+    display: flex;
+    align-items: center;
+    padding: 8px 12px;
+    background-color: #fff;
+    border-radius: 8px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    gap: 10px;
+    width: 250px;
+    height: 40px;
+}
+
+/* 附件标签样式 */
+.attachment-label {
+    font-size: 13px;
+    color: #444;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    flex: 1;
+}
+
+/* 删除附件按钮 */
+.remove-attachment {
+    width: 20px;
+    height: 20px;
+    min-width: 20px;
+    background-color: rgba(0, 0, 0, 0.1);
+    color: #666;
+    border: none;
+    border-radius: 50%;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: background-color 0.2s;
+    margin-left: auto;
+}
+
+.remove-attachment:hover {
+    background-color: rgba(255, 0, 0, 0.8);
+    color: white;
+}
+
+/* 拖放上传区域 */
+.chat-messages.drag-active {
+    background-color: rgba(74, 137, 220, 0.1);
+    border: 2px dashed #4a89dc;
+}
+
+/* 上传进度指示器 */
+.upload-progress {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background-color: #fff;
+    padding: 12px 20px;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    display: flex;
+    align-items: center;
+    z-index: 2000;
+    font-size: 15px;
+    color: #333;
+}
+
+.upload-progress svg {
+    margin-right: 12px;
+    animation: spin 1.5s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* 侧边栏切换按钮 */
+.sidebar-toggle {
+    position: fixed;
+    top: 10px;
+    left: 10px;
+    z-index: 1003;
+    background-color: #4a89dc;
+    color: white;
+    border: none;
+    width: 36px;
+    height: 36px;
+    border-radius: 4px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+}
+
+/* 顶部导航栏New Chat按钮 */
+.header-new-chat-btn {
+    position: fixed;
+    top: 10px;
+    left: 56px;
+    z-index: 1003;
+    background-color: #4a89dc;
+    color: white;
+    border: none;
+    width: 36px;
+    height: 36px;
+    border-radius: 4px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+}
+
+.header-new-chat-btn svg {
+    width: 18px;
+    height: 18px;
+    stroke-width: 2.5;
+}
+
+.header-new-chat-btn:hover,
+.sidebar-toggle:hover {
+    background-color: #3b7dd8;
+    transform: scale(1.05);
+}
+
+/* 当侧边栏关闭时，调整标题位置，避免被菜单按钮遮挡 */
+body.sidebar-collapsed .chat-header {
+    left: 0;
+    padding-left: 105px;
+}
+
+/* 侧边栏收起样式 */
+.sidebar.collapsed {
+    left: -260px !important;
+    transition: left 0.3s ease;
+}
+
+body.sidebar-collapsed .chat-container {
+    margin-left: 0 !important;
+    width: 100% !important; /* 侧边栏折叠时占据全部宽度 */
+    transition: margin-left 0.3s ease, width 0.3s ease;
+}
+
+/* 自定义整个页面的滚动条 */
+::-webkit-scrollbar {
+    width: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: #f1f1f1;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #888;
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #555;
 }
