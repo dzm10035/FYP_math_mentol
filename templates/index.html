@@ -119,17 +119,18 @@
             <form class="profile-form" id="passwordForm">
                 <div class="form-group">
                     <label for="currentPassword">Current Password</label>
-                    <input type="password" id="currentPassword" required>
+                    <input type="password" id="currentPassword" placeholder="Confirm new password"required>
                 </div>
                 <div class="form-group">
                     <label for="newPassword">New Password</label>
-                    <input type="password" id="newPassword" required>
+                    <input type="password" name="newpassword" placeholder="Enter new password" required 
+                           minlength="6" pattern="^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d]{6,}$">
                 </div>
                 <div class="form-group">
                     <label for="confirmNewPassword">Confirm New Password</label>
-                    <input type="password" id="confirmNewPassword" required>
+                    <input type="password" id="confirmNewPassword" placeholder="Confirm new password" required>
                 </div>
-                <button type="submit">Change Password</button>
+                <button name="change_password" type="submit">Change Password</button>
             </form>
         </div>
     </div>

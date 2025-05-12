@@ -315,3 +315,72 @@ function showTab(tabName) {
         showRegisterForm();
     }
 }
+
+function initPasswordToggles() {
+    const passwordInputs = document.querySelectorAll('input[type="password"]');
+    
+    passwordInputs.forEach(input => {
+        // 如果输入框已经在容器内，不重复包装
+        if (input.parentElement.classList.contains('password-input-container')) {
+            return;
+        }
+        
+        // 获取原始的表单组
+        const formGroup = input.closest('.form-group');
+        if (!formGroup) return;
+        
+        // 创建包装容器
+        const container = document.createElement('div');
+        container.className = 'password-input-container';
+        
+        // 将原始输入框替换为包装后的输入框
+        input.parentNode.insertBefore(container, input);
+        container.appendChild(input);
+        
+        // 创建切换按钮
+        const toggleBtn = document.createElement('button');
+        toggleBtn.type = 'button'; // 防止在表单中提交
+        toggleBtn.className = 'password-toggle';
+        toggleBtn.innerHTML = `
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />
+                <circle cx="12" cy="12" r="3" />
+            </svg>
+        `;
+        container.appendChild(toggleBtn);
+        
+        // 添加点击事件
+        toggleBtn.addEventListener('click', function(e) {
+            e.preventDefault(); // 防止表单提交
+            e.stopPropagation(); // 阻止事件冒泡
+            
+            // 切换密码可见性
+            const type = input.getAttribute('type') === 'password' ? 'text' : 'password';
+            input.setAttribute('type', type);
+            
+            // 更改图标
+            if (type === 'password') {
+                toggleBtn.innerHTML = `
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />
+                        <circle cx="12" cy="12" r="3" />
+                    </svg>
+                `;
+            } else {
+                toggleBtn.innerHTML = `
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M9.88 9.88a3 3 0 1 0 4.24 4.24" />
+                        <path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68" />
+                        <path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61" />
+                        <line x1="2" y1="2" x2="22" y2="22" />
+                    </svg>
+                `;
+            }
+        });
+    });
+}
+
+// 在DOM加载完成后初始化
+document.addEventListener('DOMContentLoaded', function() {
+    initPasswordToggles();
+});

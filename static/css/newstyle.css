@@ -1348,3 +1348,65 @@ body.sidebar-collapsed .chat-container {
 ::-webkit-scrollbar-thumb:hover {
     background: #555;
 }
+
+.password-input-container {
+    position: relative;
+    width: 100%;
+    margin-bottom: 0;
+}
+
+.password-input-container input {
+    width: 100%;
+    padding-right: 40px;
+    box-sizing: border-box;
+}
+
+.password-toggle {
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: #666;
+    outline: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 5;
+    transition: color 0.2s;
+    width: 20px;
+    height: 20px;
+    padding: 0;
+}
+
+.password-toggle:hover {
+    color: #333;
+    background: none;
+}
+
+.password-toggle svg {
+    width: 16px;
+    height: 16px;
+    stroke-width: 1.5;
+    opacity: 0.6;
+}
+
+.password-toggle:hover svg {
+    opacity: 0.8;
+} 
+
+.profile-form .password-toggle-btn {
+    background: none !important;
+    color: #666 !important;
+    border: none !important;
+    padding: 0 !important;
+    width: 20px !important;
+    height: 20px !important;
+}
+
+.profile-form .password-toggle-btn:hover {
+    background: none !important;
+    color: #333 !important;
+}
