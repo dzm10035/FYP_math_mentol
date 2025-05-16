@@ -63,6 +63,7 @@ function testMathOperators() {
 ## Special Notations:
 - Parentheses: \( \\left( \\frac{x}{y} \\right) \)
 - Brackets: \[ \\left[ \\frac{x}{y} \\right] \]
+- \( f(u) \neq f(v) \)
 `;
 
     // Add the message to the chat

@@ -355,17 +355,44 @@ function showChangePassword() {
 }
 
 // Change password
-async function changePassword(event) {
-    if (!event || typeof event.preventDefault !== 'function') {
-        console.error('Invalid event object');
+async function handlePasswordChange(event) {
+    // 允许函数在没有事件对象的情况下也能运行
+    if (event && typeof event.preventDefault === 'function') {
+        event.preventDefault();
+    }
+    
+    // 更健壮的获取元素值的方式
+    const currentPasswordEl = document.getElementById('currentPassword');
+    const newPasswordEl = document.getElementById('newPassword');
+    const newPasswordNameEl = document.querySelector('input[name="newpassword"]');
+    const confirmNewPasswordEl = document.getElementById('confirmNewPassword');
+    
+    if (!currentPasswordEl) {
+        console.error('Current password field not found');
+        showModalMessage('passwordForm', 'error', 'Form error: Current password field not found');
         return;
     }
     
-    event.preventDefault();
+    if (!newPasswordEl && !newPasswordNameEl) {
+        console.error('New password field not found');
+        showModalMessage('passwordForm', 'error', 'Form error: New password field not found');
+        return;
+    }
     
-    const currentPassword = document.getElementById('currentPassword').value;
-    const newPassword = document.getElementById('newPassword').value || document.querySelector('input[name="newpassword"]').value;
-    const confirmNewPassword = document.getElementById('confirmNewPassword').value;
+    if (!confirmNewPasswordEl) {
+        console.error('Confirm password field not found');
+        showModalMessage('passwordForm', 'error', 'Form error: Confirm password field not found');
+        return;
+    }
+    
+    const currentPassword = currentPasswordEl.value;
+    const newPassword = newPasswordEl ? newPasswordEl.value : (newPasswordNameEl ? newPasswordNameEl.value : '');
+    const confirmNewPassword = confirmNewPasswordEl.value;
+    
+    if (!newPassword) {
+        showModalMessage('passwordForm', 'error', 'Please enter a new password');
+        return;
+    }
     
     if (newPassword !== confirmNewPassword) {
         showModalMessage('passwordForm', 'error', 'New passwords do not match');
@@ -373,7 +400,7 @@ async function changePassword(event) {
     }
     
     try {
-        const response = await window.changePassword({
+        const response = await window.apiChangePassword({
             current_password: currentPassword,
             new_password: newPassword
         });
@@ -385,14 +412,10 @@ async function changePassword(event) {
                 showSuccessMessage(passwordBody, 'Password changed successfully!');
                 
                 // 清空表单字段
-                document.getElementById('currentPassword').value = '';
-                if (document.querySelector('input[name="newpassword"]')) {
-                    document.querySelector('input[name="newpassword"]').value = '';
-                }
-                if (document.getElementById('newPassword')) {
-                    document.getElementById('newPassword').value = '';
-                }
-                document.getElementById('confirmNewPassword').value = '';
+                if (currentPasswordEl) currentPasswordEl.value = '';
+                if (newPasswordEl) newPasswordEl.value = '';
+                if (newPasswordNameEl) newPasswordNameEl.value = '';
+                if (confirmNewPasswordEl) confirmNewPasswordEl.value = '';
                 
                 // 设置合理的延迟关闭模态框
                 setTimeout(() => {
@@ -407,11 +430,11 @@ async function changePassword(event) {
                 }, 1500);
             }
         } else {
-            showModalMessage('passwordForm', 'error', response.error || 'Password change failed');
+            showModalMessage('passwordForm', 'error', (response && response.error) || 'Password change failed');
         }
     } catch (error) {
         console.error('Password change error:', error);
-        showModalMessage('passwordForm', 'error', 'Password change failed: ' + error.message);
+        showModalMessage('passwordForm', 'error', 'Password change failed: ' + (error.message || 'Unknown error'));
     }
 }
 
@@ -435,7 +458,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Add change password form submission event
     const passwordForm = document.getElementById('passwordForm');
     if (passwordForm) {
-        passwordForm.addEventListener('submit', changePassword);
+        passwordForm.addEventListener('submit', handlePasswordChange);
     }
     
     // Add checkbox selection effect
@@ -530,6 +553,8 @@ window.showPreferences = showPreferences;
 window.showProfile = showProfile;
 window.showChangePassword = showChangePassword;
 window.closeModal = closeModal;
+window.handlePasswordChange = handlePasswordChange;
+window.changePassword = handlePasswordChange; // 为了向后兼容
 
 function initPasswordToggles() {
     const passwordInputs = document.querySelectorAll('input[type="password"]');

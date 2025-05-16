@@ -1,3 +1,31 @@
+// 确保主题初始化
+(function() {
+    // 检查是否已经有主题类
+    const hasLightTheme = document.body.classList.contains('light-theme');
+    const hasDarkTheme = document.body.classList.contains('dark-theme');
+    
+    if (!hasLightTheme && !hasDarkTheme) {
+        // 从localStorage获取保存的主题，默认为light
+        const savedTheme = localStorage.getItem('theme') || 'light';
+        document.body.classList.add(`${savedTheme}-theme`);
+        
+        // 同步更新图标显示
+        const moonIcon = document.querySelector('.moon-icon');
+        const sunIcon = document.querySelector('.sun-icon');
+        if (moonIcon && sunIcon) {
+            if (savedTheme === 'dark') {
+                moonIcon.style.display = 'none';
+                sunIcon.style.display = 'block';
+            } else {
+                moonIcon.style.display = 'block';
+                sunIcon.style.display = 'none';
+            }
+        }
+        
+        console.log('应用主题:', savedTheme);
+    }
+})();
+
 // Show tab function
 function showTab(tab) {
     const loginForm = document.getElementById('loginForm');
@@ -38,18 +66,35 @@ function showMessage(message, type = 'error') {
         
         // 创建新消息元素
         const messageElement = document.createElement('div');
-        messageElement.className = `form-message ${type}`;
+        messageElement.className = `message ${type}`;  // 使用auth.html中定义的样式类
         messageElement.textContent = message;
         messageElement.style.display = 'block';
         
         // 添加消息到容器
         messageContainer.appendChild(messageElement);
         
-        // 如果是成功消息，3秒后自动移除
+        // 直接设置样式，确保消息可见
         if (type === 'success') {
+            messageElement.style.backgroundColor = '#efe';
+            messageElement.style.color = '#0a0';
+            messageElement.style.border = '1px solid #0a0';
+            messageElement.style.padding = '10px';
+            messageElement.style.borderRadius = '4px';
+            messageElement.style.textAlign = 'center';
+            messageElement.style.marginTop = '10px';
+            
+            // 如果是成功消息，3秒后自动移除
             setTimeout(() => {
                 messageElement.remove();
             }, 3000);
+        } else {
+            messageElement.style.backgroundColor = '#fee';
+            messageElement.style.color = '#c00';
+            messageElement.style.border = '1px solid #c00';
+            messageElement.style.padding = '10px';
+            messageElement.style.borderRadius = '4px';
+            messageElement.style.textAlign = 'center';
+            messageElement.style.marginTop = '10px';
         }
     } else {
         console.error('Message container not found');
