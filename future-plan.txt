@@ -4,5 +4,5 @@
 #technical
 add support file document upload and photo
 improve prompt word
-user choose math topic 
+user choose math topic [complete50%？]
 graph display (example quadrartic equation can show in graph)

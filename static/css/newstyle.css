@@ -1766,3 +1766,44 @@ body.dark-theme .dark-theme-option .theme-preview {
   background-color: white;
   box-shadow: 0 0 5px rgba(255, 255, 255, 0.5);
 }
+
+/* Suggestion Cards */
+.suggestion-cards-grid {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 12px; /* Increased gap slightly */
+    width: 100%;
+    max-width: 800px;
+    padding: 0 10px; /* Add some padding if container is full-width */
+}
+
+.suggestion-card {
+    background-color: var(--input-bg); /* Use input background color or similar */
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
+    padding: 10px 15px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: all 0.2s ease-in-out;
+    box-shadow: var(--box-shadow);
+    text-align: center;
+}
+
+.suggestion-card:hover {
+    background-color: var(--hover-color);
+    color: var(--btn-text);
+    border-color: var(--accent-color);
+    transform: translateY(-2px);
+}
+
+.suggestion-card:focus {
+    outline: 2px solid var(--accent-color);
+    outline-offset: 2px;
+}
+
+/* Make sure the welcome container itself can be hidden if needed */
+.welcome-container.hidden {
+    display: none !important;
+}

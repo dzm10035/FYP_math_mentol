@@ -34,6 +34,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     } catch (error) {
         console.error('Failed to load chat sessions:', error);
     }
+    
+    // Load and render suggestion cards
+    await loadAndRenderSuggestionCards();
 });
 
 // 初始化侧边栏切换功能
@@ -594,3 +597,137 @@ function toggleSidebar() {
         console.error('Sidebar element not found when toggling');
     }
 }
+
+async function loadAndRenderSuggestionCards() {
+    const suggestionContainer = document.getElementById('suggestionCardsContainer');
+    const welcomeContainer = document.querySelector('.welcome-container');
+
+    if (!suggestionContainer || !welcomeContainer || welcomeContainer.style.display === 'none') {
+        // If the welcome container isn't there or is hidden, don't try to render cards.
+        return;
+    }
+
+    // Minimal translations needed for card generation and interaction, independent of user.js uiTranslations
+    const cardSpecificTranslations = {
+        en: {
+            askOrPick: "Ask anything about math, or pick a topic to start:",
+            askAnythingOnly: "Ask anything about math...",
+            iWouldLikeToLearn: "I would like to learn",
+            welcomeUser: "What can MathMentor help with?"
+        },
+        zh: {
+            askOrPick: "可以问任何数学问题，或选择一个主题开始：",
+            askAnythingOnly: "可以问任何数学问题...",
+            iWouldLikeToLearn: "我想学习",
+            welcomeUser: "MathMentor 能为你做些什么？"
+        },
+        ms: {
+            askOrPick: "Tanya apa sahaja mengenai matematik, atau pilih topik untuk bermula:",
+            askAnythingOnly: "Tanya apa sahaja mengenai matematik...",
+            iWouldLikeToLearn: "Saya ingin belajar",
+            welcomeUser: "Bagaimana MathMentor boleh membantu anda?"
+        }
+    };
+
+    let lang = 'en'; // Default language for cards if preferences are not available yet
+    let userPreferredTopics = [];
+
+    try {
+        if (window.currentPreferences) {
+            lang = window.currentPreferences.language || 'en';
+            userPreferredTopics = window.currentPreferences.math_topics || [];
+        } else {
+            // Attempt to fetch if not available, but don't let it block initial card rendering too much
+            // This is a fallback, ideally currentPreferences is set by user.js before this runs extensively.
+            console.log('currentPreferences not found in chat.js for cards, attempting fetch...');
+            const prefData = await window.getUserPreferences(); 
+            if (prefData && prefData.success && prefData.preferences) {
+                window.currentPreferences = prefData.preferences; // Cache globally
+                lang = prefData.preferences.language || 'en';
+                userPreferredTopics = prefData.preferences.math_topics || [];
+            } else {
+                console.warn('Failed to fetch user preferences in chat.js for cards. Using defaults.');
+            }
+        }
+
+        const currentCardTranslations = cardSpecificTranslations[lang] || cardSpecificTranslations.en;
+        
+        const response = await fetch(`/api/math_topics/${lang}?v=${new Date().getTime()}`);
+        if (!response.ok) {
+            throw new Error(`Failed to fetch math topics: ${response.status}`);
+        }
+        const allTopics = await response.json(); // Expected: {key: "Name", ...}
+
+        const headerElement = document.querySelector('.typewriter');
+        if (headerElement) {
+            headerElement.textContent = currentCardTranslations.welcomeUser;
+        }   
+
+        if (Object.keys(allTopics).length === 0) {
+            const subtitle = welcomeContainer.querySelector('.welcome-subtitle');
+            if(subtitle) subtitle.textContent = currentCardTranslations.askAnythingOnly;
+            suggestionContainer.innerHTML = '';
+            return;
+        }
+
+        let topicsToDisplay = {};
+        if (userPreferredTopics && userPreferredTopics.length > 0) {
+            userPreferredTopics.forEach(key => {
+                if (allTopics[key]) {
+                    topicsToDisplay[key] = allTopics[key];
+                }
+            });
+            if (Object.keys(topicsToDisplay).length === 0) { // Fallback if preferred topics don't match any from API
+                topicsToDisplay = allTopics;
+            }
+        } else {
+            topicsToDisplay = allTopics;
+        }
+        
+        suggestionContainer.innerHTML = ''; 
+
+        if (Object.keys(topicsToDisplay).length > 0) {
+            const subtitle = welcomeContainer.querySelector('.welcome-subtitle');
+            if(subtitle) subtitle.textContent = currentCardTranslations.askOrPick;
+
+            Object.entries(topicsToDisplay).forEach(([topicKey, topicName]) => {
+                const card = document.createElement('div');
+                card.className = 'suggestion-card';
+                card.textContent = topicName;
+                card.setAttribute('role', 'button');
+                card.setAttribute('tabindex', '0');
+                card.addEventListener('click', () => {
+                    const message = `${currentCardTranslations.iWouldLikeToLearn} ${topicName}`;
+                    messageInput.value = message; 
+                    handleSendMessage(); 
+                });
+                card.addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                        card.click();
+                    }
+                });
+                suggestionContainer.appendChild(card);
+            });
+        } else {
+            const subtitle = welcomeContainer.querySelector('.welcome-subtitle');
+             if(subtitle) subtitle.textContent = currentCardTranslations.askAnythingOnly;
+        }
+
+    } catch (error) {
+        console.error('Error loading or rendering suggestion cards:', error);
+        const subtitle = welcomeContainer.querySelector('.welcome-subtitle');
+        // Fallback to a very basic message on error
+        if(subtitle) subtitle.textContent = cardSpecificTranslations.en.askAnythingOnly; 
+        if(suggestionContainer) suggestionContainer.innerHTML = ''; 
+    }
+}
+
+// Make it globally accessible if user.js needs to refresh it (e.g., after preference save)
+window.loadAndRenderSuggestionCards = loadAndRenderSuggestionCards;
+
+// Ensure this is called in your main DOMContentLoaded or chat initialization logic
+// Example (assuming it's in DOMContentLoaded already from previous steps):
+// document.addEventListener('DOMContentLoaded', async () => {
+//     // ... other initializations ...
+//     await loadAndRenderSuggestionCards(); // Already added this line previously
+// });

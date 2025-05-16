@@ -1,6 +1,98 @@
 // Preference related functions
 let currentPreferences = null;
 
+const uiTranslations = window.uiTranslations || {
+    en: {
+        preferencesTitle: "Preferences",
+        languageSettings: "Language Settings",
+        themeSettings: "Theme Settings",
+        mathTopics: "Math Topics",
+        cancelButton: "Cancel",
+        saveSettingsButton: "Save Settings",
+        profileLink: "Profile",
+        preferencesLinkMenu: "Preferences",
+        changePasswordLink: "Change Password",
+        logoutLink: "Logout",
+        adminPanelLink: "Admin Panel",
+        lightThemeLabel: "Light Theme",
+        darkThemeLabel: "Dark Theme",
+        profileModalTitle: "Profile",
+        saveChangesButton: "Save Changes",
+        changePasswordModalTitle: "Change Password",
+        changePasswordButton: "Change Password",
+    },
+    zh: {
+        preferencesTitle: "偏好设置",
+        languageSettings: "语言设置",
+        themeSettings: "主题设置",
+        mathTopics: "数学主题",
+        cancelButton: "取消",
+        saveSettingsButton: "保存设置",
+        profileLink: "个人资料",
+        preferencesLinkMenu: "偏好设置",
+        changePasswordLink: "修改密码",
+        logoutLink: "登出",
+        adminPanelLink: "管理员面板",
+        lightThemeLabel: "亮色主题",
+        darkThemeLabel: "暗色主题",
+        profileModalTitle: "个人资料",
+        saveChangesButton: "保存更改",
+        changePasswordModalTitle: "修改密码",
+        changePasswordButton: "修改密码",
+    },
+    ms: {
+        preferencesTitle: "Keutamaan",
+        languageSettings: "Tetapan Bahasa",
+        themeSettings: "Tetapan Tema",
+        mathTopics: "Topik Matematik",
+        cancelButton: "Batal",
+        saveSettingsButton: "Simpan Tetapan",
+        profileLink: "Profil",
+        preferencesLinkMenu: "Keutamaan",
+        changePasswordLink: "Tukar Kata Laluan",
+        logoutLink: "Log Keluar",
+        adminPanelLink: "Panel Pentadbir",
+        lightThemeLabel: "Tema Cerah",
+        darkThemeLabel: "Tema Gelap",
+        profileModalTitle: "Profil",
+        saveChangesButton: "Simpan Perubahan",
+        changePasswordModalTitle: "Tukar Kata Laluan",
+        changePasswordButton: "Tukar Kata Laluan",
+    }
+};
+window.uiTranslations = uiTranslations; // Make sure it's globally available for chat.js if needed
+
+function updateLimitedUIText(lang) {
+    const translations = uiTranslations[lang] || uiTranslations.zh;
+    const prefModal = document.getElementById('preferencesModal');
+    if (prefModal) {
+        const titleEl = prefModal.querySelector('.preferences-header h2');
+        if (titleEl) titleEl.textContent = translations.preferencesTitle;
+        
+        const sectionTitles = prefModal.querySelectorAll('.preferences-body .pref-section .pref-title');
+        if (sectionTitles.length >= 3) {
+            // Attempt to update text node for elements with icons
+            const updateNodeText = (el, text) => {
+                for(let i = 0; i < el.childNodes.length; i++) {
+                    if(el.childNodes[i].nodeType === Node.TEXT_NODE && el.childNodes[i].nodeValue.trim() !== '') {
+                        el.childNodes[i].nodeValue = ` ${text}`;
+                        break;
+                    }
+                }
+            };
+            updateNodeText(sectionTitles[0], translations.languageSettings);
+            updateNodeText(sectionTitles[1], translations.themeSettings);
+            updateNodeText(sectionTitles[2], translations.mathTopics);
+        }
+        const cancelBtn = prefModal.querySelector('.cancel-btn');
+        if (cancelBtn) cancelBtn.textContent = translations.cancelButton;
+        const saveBtn = prefModal.querySelector('.save-btn');
+        if (saveBtn) saveBtn.textContent = translations.saveSettingsButton;
+    }
+    // Add other critical UI elements here if they were working before and are simple
+    document.documentElement.lang = lang;
+}
+
 // Show preferences dialog
 function showPreferences() {
     // Load existing preferences
@@ -11,88 +103,103 @@ function showPreferences() {
 
 // 处理语言变化并更新数学主题
 function handleLanguageChange(lang) {
-    // 重新加载数学主题
-    loadMathTopics();
+    // This function is called when the radio button INSIDE the preferences modal changes.
+    document.documentElement.lang = lang; // Good for CSS or other dynamic lang-based rules
+    loadMathTopics(lang);       // Updates math topics list inside the modal
+    updateLimitedUIText(lang);  // Updates text inside the modal for preview
 }
 
 // 从API获取并更新数学主题的翻译
 async function updateMathTopics(lang) {
     // 这个函数已被loadMathTopics替代，保留以兼容旧代码
-    await loadMathTopics();
+    await loadMathTopics(lang);
 }
 
 // Load user preferences
 async function loadUserPreferences() {
     try {
-        // 1. 先加载数学主题
-        await loadMathTopics();
-        
-        // 2. 获取用户偏好设置
         const data = await window.getUserPreferences();
-        if (!data || !data.success) return;
+        let languageToUse = 'zh'; // Default to Chinese
+
+        if (data && data.success && data.preferences) {
+            currentPreferences = data.preferences;
+            languageToUse = currentPreferences.language || 'zh';
+        } else {
+            currentPreferences = { language: 'zh', math_topics: [] };
+        }
         
-        currentPreferences = data.preferences;
+        await loadMathTopics(languageToUse); // Load topics for the modal
         
-        // Fill language selection
-        const language = currentPreferences.language || 'en';
-        const languageRadio = document.getElementById(`lang-${language}`);
+        const languageRadio = document.getElementById(`lang-${languageToUse}`);
         if (languageRadio) {
             languageRadio.checked = true;
         }
         
-        // Select current theme
+        updateLimitedUIText(languageToUse); // Update modal text
+        // DO NOT call full updateUIText here if it breaks things. Focus on modal + default lang.
+
+        // Theme and math topics selection in modal (remains as before)
         const currentTheme = localStorage.getItem('theme') || 'light';
         document.querySelectorAll('.theme-preview').forEach(preview => {
             preview.style.borderColor = 'transparent';
+            preview.style.transform = 'none';
         });
-        const activeThemePreview = document.querySelector(`.${currentTheme}-preview`);
+        const activeThemePreview = document.querySelector(`.${currentTheme}-theme-option .theme-preview`);
         if (activeThemePreview) {
             activeThemePreview.style.borderColor = 'var(--accent-color)';
             activeThemePreview.style.transform = 'scale(1.05)';
         }
-        
-        // 选中用户已保存的数学主题
         const mathTopics = currentPreferences.math_topics || [];
         mathTopics.forEach(topic => {
             const checkbox = document.getElementById(`topic-${topic}`);
             if (checkbox) {
                 checkbox.checked = true;
-                // 添加选中样式
                 const topicChip = checkbox.closest('.topic-chip');
-                if (topicChip) {
-                    topicChip.classList.add('selected');
-                }
+                if (topicChip) topicChip.classList.add('selected');
             }
         });
+
     } catch (error) {
         console.error('Failed to load preferences:', error);
-        showModalMessage('preferencesForm', 'error', 'load preferences failed: ' + error.message);
+        currentPreferences = { language: 'zh', math_topics: [] };
+        await loadMathTopics('zh');
+        updateLimitedUIText('zh');
+        const langRadioZh = document.getElementById('lang-zh');
+        if (langRadioZh) langRadioZh.checked = true;
     }
 }
 
 // 初始化加载数学主题
-async function loadMathTopics() {
+async function loadMathTopics(forcedLanguage = null) {
     try {
-        // 获取当前语言，默认为英文
-        const language = document.querySelector('input[name="language"]:checked')?.value || 'en';
-        
-        // 获取数学主题
-        const response = await fetch(`/api/math_topics/${language}`);
-        if (!response.ok) {
-            throw new Error('Failed to load math topics');
+        let language;
+        if (forcedLanguage) {
+            language = forcedLanguage;
+        } else {
+            // Fallback to selected radio or 'zh' if modal is open, otherwise use currentPreferences or 'zh'
+            const selectedRadio = document.querySelector('input[name="language"]:checked');
+            if (selectedRadio) {
+                language = selectedRadio.value;
+            } else if (currentPreferences && currentPreferences.language) {
+                language = currentPreferences.language;
+            } else {
+                language = 'zh';
+            }
         }
         
-        const mathTopics = await response.json();
+        const response = await fetch(`/api/math_topics/${language}`);
+        if (!response.ok) {
+            throw new Error(`Failed to load math topics (status: ${response.status})`);
+        }
         
-        // 生成主题选择HTML
+        const mathTopicsData = await response.json();
+        
         const topicsGrid = document.querySelector('.topics-grid');
         if (!topicsGrid) return;
         
-        // 清空现有内容
         topicsGrid.innerHTML = '';
         
-        // 动态生成主题选择项
-        Object.entries(mathTopics).forEach(([topicKey, topicName]) => {
+        Object.entries(mathTopicsData).forEach(([topicKey, topicName]) => {
             const topicChip = document.createElement('div');
             topicChip.className = 'topic-chip';
             
@@ -103,18 +210,25 @@ async function loadMathTopics() {
             
             topicsGrid.appendChild(topicChip);
             
-            // 添加选择事件
             const checkbox = topicChip.querySelector('input[type="checkbox"]');
             if (checkbox) {
                 checkbox.addEventListener('change', () => {
-                    if (checkbox.checked) {
-                        topicChip.classList.add('selected');
-                    } else {
-                        topicChip.classList.remove('selected');
-                    }
+                    topicChip.classList.toggle('selected', checkbox.checked);
                 });
             }
         });
+        
+        // Re-check previously selected topics if currentPreferences is available
+        if (currentPreferences && currentPreferences.math_topics) {
+            currentPreferences.math_topics.forEach(topicKey => {
+                const checkbox = document.getElementById(`topic-${topicKey}`);
+                if (checkbox) {
+                    checkbox.checked = true;
+                    const topicChip = checkbox.closest('.topic-chip');
+                    if (topicChip) topicChip.classList.add('selected');
+                }
+            });
+        }
         
     } catch (error) {
         console.error('Failed to load math topics:', error);
@@ -124,32 +238,37 @@ async function loadMathTopics() {
 // Save user preferences
 async function savePreferences(event) {
     event.preventDefault();
-    
-    // Get selected language
-    const selectedLanguage = document.querySelector('input[name="language"]:checked');
-    const language = selectedLanguage ? selectedLanguage.value : 'en';
-    
-    // Get selected math topics
+    const selectedLanguageInput = document.querySelector('input[name="language"]:checked');
+    const language = selectedLanguageInput ? selectedLanguageInput.value : 'zh';
     const mathTopicsCheckboxes = document.querySelectorAll('input[name="mathTopics"]:checked');
-    
-    const preferences = {
+    const preferencesToSave = {
         preferred_language: language,
         math_topics: Array.from(mathTopicsCheckboxes).map(cb => cb.value)
     };
-    
+
     try {
-        const response = await window.updatePreferences(preferences);
+        const response = await window.updatePreferences(preferencesToSave);
         if (response && response.success) {
-            // 显示成功消息在更明显的位置
+            // Update global currentPreferences IMMEDIATELY
+            currentPreferences = {
+                language: language,
+                math_topics: preferencesToSave.math_topics
+            };
+            window.currentPreferences = currentPreferences; 
+            document.documentElement.lang = language; // Update HTML lang attribute
+
+            // Call this for suggestion cards on the main page
+            if (typeof window.loadAndRenderSuggestionCards === 'function') {
+                window.loadAndRenderSuggestionCards();
+            }
+
+            updateLimitedUIText(language); // Update limited UI (e.g., modal if it were to stay open)
+
             const prefBody = document.querySelector('.preferences-body');
-            showSuccessMessage(prefBody, 'preferences updated!');
-            
-            // 设置合理的延迟关闭模态框
-            setTimeout(() => {
-                closeModal('preferencesModal');
-            }, 500);
+            showSuccessMessage(prefBody, 'Preferences updated!');
+            setTimeout(() => closeModal('preferencesModal'), 500);
         } else {
-            showModalMessage('preferencesForm', 'error', response.error || 'update failed');
+            showModalMessage('preferencesForm', 'error', (response && response.error) || 'update failed');
         }
     } catch (error) {
         console.error('Preference update error:', error);
@@ -439,7 +558,26 @@ async function handlePasswordChange(event) {
 }
 
 // Initialize event listeners
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', async function() {
+    // Initial load of user preferences for UI text update
+    try {
+        const data = await window.getUserPreferences();
+        let initialLang = 'zh'; 
+        if (data && data.success && data.preferences && data.preferences.language) {
+            currentPreferences = data.preferences; 
+            initialLang = data.preferences.language;
+        } else {
+            currentPreferences = { language: 'zh', math_topics: [] };
+        }
+        document.documentElement.lang = initialLang; 
+        updateLimitedUIText(initialLang); // For any initially visible UI managed by this limited update
+    } catch (error) {
+        console.error('Failed to load initial preferences for UI:', error);
+        currentPreferences = { language: 'zh', math_topics: [] };
+        document.documentElement.lang = 'zh'; 
+        updateLimitedUIText('zh'); 
+    }
+
     // Add preferences form submission event
     const preferencesForm = document.getElementById('preferencesForm');
     if (preferencesForm) {
@@ -449,33 +587,25 @@ document.addEventListener('DOMContentLoaded', function() {
     // Add personal information form submission event
     const profileForm = document.getElementById('profileForm');
     if (profileForm) {
-        // 移除所有现有的submit事件监听器，确保不会重复绑定
-        profileForm.removeEventListener('submit', updateProfile);
-        // 添加一个新的监听器
-        profileForm.addEventListener('submit', updateProfile);
+        profileForm.removeEventListener('submit', window.updateProfile);
+        profileForm.addEventListener('submit', window.updateProfile);
     }
     
     // Add change password form submission event
     const passwordForm = document.getElementById('passwordForm');
     if (passwordForm) {
-        passwordForm.addEventListener('submit', handlePasswordChange);
+        passwordForm.addEventListener('submit', window.handlePasswordChange);
     }
     
-    // Add checkbox selection effect
     document.querySelectorAll('.checkbox-label').forEach(label => {
         const checkbox = label.querySelector('input[type="checkbox"]');
         if (checkbox) {
             checkbox.addEventListener('change', () => {
-                if (checkbox.checked) {
-                    label.classList.add('selected');
-                } else {
-                    label.classList.remove('selected');
-                }
+                label.classList.toggle('selected', checkbox.checked);
             });
         }
     });
     
-    // User menu toggle
     const userMenuButton = document.querySelector('.user-menu-button');
     if (userMenuButton) {
         userMenuButton.addEventListener('click', function(event) {
@@ -490,12 +620,10 @@ document.addEventListener('DOMContentLoaded', function() {
         console.error('User menu button not found');
     }
     
-    // Add menu item click handlers
     const profileLink = document.querySelector('.profile-link');
     if (profileLink) {
         profileLink.addEventListener('click', function(event) {
             event.preventDefault();
-            console.log('Profile link clicked');
             showProfile();
             document.querySelector('.user-menu-content').style.display = 'none';
         });
@@ -505,7 +633,6 @@ document.addEventListener('DOMContentLoaded', function() {
     if (preferencesLink) {
         preferencesLink.addEventListener('click', function(event) {
             event.preventDefault();
-            console.log('Preferences link clicked');
             showPreferences();
             document.querySelector('.user-menu-content').style.display = 'none';
         });
@@ -515,13 +642,11 @@ document.addEventListener('DOMContentLoaded', function() {
     if (changePasswordLink) {
         changePasswordLink.addEventListener('click', function(event) {
             event.preventDefault();
-            console.log('Change password link clicked');
             showChangePassword();
             document.querySelector('.user-menu-content').style.display = 'none';
         });
     }
     
-    // Close user menu when clicking outside
     document.addEventListener('click', function(event) {
         const userMenuContent = document.querySelector('.user-menu-content');
         const userMenuButton = document.querySelector('.user-menu-button');
@@ -529,15 +654,13 @@ document.addEventListener('DOMContentLoaded', function() {
         if (userMenuContent && 
             userMenuContent.style.display === 'block' && 
             !userMenuContent.contains(event.target) && 
-            !userMenuButton.contains(event.target)) {
+            (userMenuButton && !userMenuButton.contains(event.target))) {
             userMenuContent.style.display = 'none';
         }
     });
     
-    // Initialize password toggles
     initPasswordToggles();
     
-    // 添加语言选择变化事件处理
     const languageOptions = document.querySelectorAll('input[name="language"]');
     languageOptions.forEach(option => {
         option.addEventListener('change', function() {
