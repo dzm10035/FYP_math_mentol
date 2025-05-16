@@ -1,0 +1,28 @@
+:root {
+    /* 浅色模式的默认变量 - 使用wcburgess配色 */
+    --bg-color: #fafafa;
+    --container-bg: #e4e5f1;
+    --border-color: #d2d3db;
+    --text-secondary: #9394a5;
+    --text-primary: #484b6a;
+    --accent-color: #6d71a1;
+    --hover-color: #8286b5;
+    --btn-text: #ffffff;
+    --input-bg: #ffffff;
+    --input-border: #d2d3db;
+    --input-text: #484b6a;
+    --input-placeholder: #9394a5;
+    --box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    --modal-backdrop: rgba(72, 75, 106, 0.5);
+    --success-color: #4caf50;
+    --error-color: #f44336;
+    --warning-color: #ff9800;
+    --info-color: #6d71a1;
+    --user-message-bg: var(--accent-color);
+    --bot-message-bg: #ffffff;
+    --chat-header-bg: var(--accent-color);
+    --sidebar-bg: var(--container-bg);
+    --modal-bg: #ffffff;
+    --message-bg: #ffffff;
+    --link-color: var(--accent-color);
+  }

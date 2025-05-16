@@ -1,0 +1,394 @@
+/* Dark Theme */
+
+:root {
+    /* 主要颜色变量 */
+    --bg-color: #121212;
+    --container-bg: #1e1e1e;
+    --border-color: #333;
+    --text-secondary: #aaaaaa;
+    --text-primary: #f0f0f0;
+    
+    /* 功能性颜色 */
+    --accent-color: #555;
+    --hover-color: #666;
+    --btn-text: #ffffff;
+    --input-bg: #252525;
+    --input-border: #333;
+    --input-text: #f0f0f0;
+    --input-placeholder: #aaa;
+    --box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
+    --modal-backdrop: rgba(0, 0, 0, 0.5);
+    --modal-bg: #252525;
+    
+    /* 状态颜色 */
+    --success-color: #70ff70;
+    --error-color: #ff7070;
+    --warning-color: #ffbb70;
+    --info-color: #70a0ff;
+    
+    /* 聊天相关变量 */
+    --user-message-bg: #333;
+    --bot-message-bg: #252525;
+    --chat-header-bg: #252525;
+    --sidebar-bg: #1a1a1a;
+    --message-bg: #222;
+    --link-color: #8286b5;
+}
+
+/* 基本样式 */
+body {
+    background-color: var(--bg-color);
+    color: var(--text-primary);
+}
+
+/* 侧边栏样式 */
+.sidebar {
+    background-color: var(--sidebar-bg);
+    border-color: var(--border-color);
+}
+
+.chat-item {
+    background-color: #222;
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    margin-bottom: 5px;
+}
+
+.chat-title {
+    color: var(--text-primary); 
+}
+
+.chat-item:hover {
+    background-color: #2a2a2a;
+}
+
+.chat-item.active {
+    background-color: #333;
+    border-left-color: #555;
+}
+
+.new-chat-btn {
+    background-color: #444;
+    color: var(--text-primary);
+}
+
+.new-chat-btn:hover {
+    background-color: #555;
+}
+
+/* 导航栏和头部按钮 */
+.sidebar-toggle,
+.header-new-chat-btn {
+    background-color: #555;
+    color: white;
+}
+
+.sidebar-toggle:hover,
+.header-new-chat-btn:hover {
+    background-color: #666;
+}
+
+/* 聊天区域样式 */
+.chat-header {
+    background-color: var(--chat-header-bg);
+}
+
+.chat-messages {
+    background-color: var(--bg-color);
+}
+
+.user-message {
+    background-color: var(--user-message-bg);
+    color: #fff;
+}
+
+.bot-message {
+    background-color: var(--bot-message-bg);
+    color: var(--text-primary);
+    border-color: var(--border-color);
+    box-shadow: var(--box-shadow);
+}
+
+.chat-input-container {
+    background-color: var(--sidebar-bg);
+}
+
+.chat-input {
+    background-color: var(--input-bg);
+    border-color: var(--border-color);
+}
+
+#messageInput {
+    background-color: var(--input-bg);
+    color: var(--input-text);
+}
+
+.send-button {
+    color: var(--text-primary);
+}
+
+/* 欢迎文本颜色 */
+.welcome-container p {
+    color: #aaa;
+}
+
+.typewriter {
+    color: var(--text-primary);
+}
+
+/* 模态框样式 */
+.modal-content,
+.modal-content * {
+    background-color: var(--modal-bg);
+    color: var(--text-primary);
+    border-color: var(--border-color);
+}
+
+.modal-content h2,
+h2 {
+    color: var(--text-primary);
+}
+
+.profile-form input,
+.profile-form select,
+.profile-form textarea {
+    background-color: var(--input-bg);
+    color: var(--input-text);
+    border-color: var(--border-color);
+}
+
+/* 全局按钮样式 */
+button,
+input[type="button"],
+input[type="submit"],
+.btn,
+.btn-primary {
+    background-color: #555;
+    color: white;
+    border-color: #444;
+}
+
+button:hover,
+input[type="button"]:hover,
+input[type="submit"]:hover,
+.btn:hover,
+.btn-primary:hover {
+    background-color: #666;
+}
+
+/* 特定模态框样式 */
+#profileModal,
+#preferencesModal,
+#passwordModal {
+    background-color: rgba(0, 0, 0, 0.5);
+}
+
+#profileModal .modal-content,
+#preferencesModal .modal-content,
+#passwordModal .modal-content {
+    background-color: #252525;
+}
+
+.modal-content label {
+    color: #ccc;
+}
+
+.modal-content input,
+.modal-content select,
+.modal-content textarea {
+    background-color: #333;
+    color: #f0f0f0;
+    border-color: #444;
+}
+
+.modal-close {
+    color: #ccc;
+}
+
+.user-menu-button {
+    color: var(--text-primary);
+}
+
+/* 退出按钮颜色修复 */
+.user-menu-item.logout {
+    color: #ff6b6b;
+}
+
+/* 滚动条样式 */
+::-webkit-scrollbar-track {
+    background: #2d2d2d;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #555;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #666;
+}
+
+/* 用户菜单样式 */
+.user-menu-content {
+    background-color: var(--modal-bg);
+    color: var(--text-primary);
+    border-color: var(--border-color);
+}
+
+.user-menu-item:hover {
+    background-color: #444;
+}
+
+/* 预览和上传区域样式 */
+.preview-container,
+.attachments-preview-area {
+    background-color: var(--modal-bg);
+    border-color: var(--border-color);
+}
+
+/* 代码块样式 */
+.message code {
+    background-color: #333;
+    border: 1px solid #444;
+}
+
+.message pre {
+    background-color: #222;
+    border: 1px solid #444;
+}
+
+/* 消息内容样式 */
+.message-content a {
+    color: var(--link-color);
+}
+
+/* 表单链接颜色 */
+.form-links a {
+    color: var(--link-color);
+}
+
+/* 标签和输入框提示 */
+label,
+.input-help {
+    color: #aaa;
+}
+
+/* 特殊按钮和交互元素 */
+.upload-button:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+    color: #aaa;
+}
+
+.main-upload-button {
+    background-color: #333;
+    color: #aaa;
+}
+
+.main-upload-button:hover {
+    background-color: #444;
+    color: #ccc;
+}
+
+.chat-messages.drag-active {
+    background-color: rgba(85, 85, 85, 0.3);
+    border: 2px dashed #666;
+}
+
+.image-option,
+.document-option {
+    color: #aaa;
+}
+
+.message-content a[href$=".pdf"],
+.message-content a[href$=".doc"],
+.message-content a[href$=".docx"],
+.message-content a[href$=".txt"],
+.message-content a[href$=".xlsx"],
+.message-content a[href$=".xls"] {
+    background-color: #333;
+    color: #aaaaff;
+}
+
+.message-content a[href$=".pdf"]:hover,
+.message-content a[href$=".doc"]:hover,
+.message-content a[href$=".docx"]:hover,
+.message-content a[href$=".txt"]:hover,
+.message-content a[href$=".xlsx"]:hover,
+.message-content a[href$=".xls"]:hover {
+    background-color: #444;
+}
+
+.upload-progress {
+    background-color: #333;
+    color: #f0f0f0;
+}
+
+/* 数学公式区域 */
+.math-block {
+    background-color: #2d2d2d;
+    border-color: var(--border-color);
+}
+
+/* 特定元素覆盖 */
+.tab.active {
+    color: #ccc;
+    border-bottom-color: #666;
+}
+
+.checkbox-label input[type="checkbox"]:checked + span {
+    color: #ccc;
+}
+
+.checkbox-label.selected {
+    background-color: #444;
+    border-color: #666;
+}
+
+select:focus,
+input:focus {
+    border-color: #666;
+    box-shadow: 0 0 0 2px rgba(85, 85, 85, 0.4);
+}
+
+/* 主题切换按钮 */
+.theme-toggle {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    background-color: #555;
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 48px;
+    height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 1000;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+    transition: background-color 0.3s ease;
+}
+
+.theme-toggle:hover {
+    background-color: #666;
+}
+
+.theme-toggle svg {
+    width: 24px;
+    height: 24px;
+}
+
+/* Auth页面 */
+.auth-container {
+    background-color: transparent !important; 
+}
+
+/* 链接颜色调整 */
+a {
+    color: #8286b5;
+}
+
+a:hover {
+    color: #9da1d0;
+}

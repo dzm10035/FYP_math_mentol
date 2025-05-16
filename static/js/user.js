@@ -18,8 +18,22 @@ async function loadUserPreferences() {
         currentPreferences = data.preferences;
         
         // Fill language selection
-        const languageSelect = document.getElementById('preferredLanguage');
-        languageSelect.value = currentPreferences.language || 'zh';
+        const language = currentPreferences.language || 'zh';
+        const languageRadio = document.getElementById(`lang-${language}`);
+        if (languageRadio) {
+            languageRadio.checked = true;
+        }
+        
+        // Select current theme
+        const currentTheme = localStorage.getItem('theme') || 'light';
+        document.querySelectorAll('.theme-preview').forEach(preview => {
+            preview.style.borderColor = 'transparent';
+        });
+        const activeThemePreview = document.querySelector(`.${currentTheme}-preview`);
+        if (activeThemePreview) {
+            activeThemePreview.style.borderColor = 'var(--accent-color)';
+            activeThemePreview.style.transform = 'scale(1.05)';
+        }
         
         // Fill math topics selection
         const mathTopics = currentPreferences.math_topics || [];
@@ -27,15 +41,10 @@ async function loadUserPreferences() {
         
         checkboxes.forEach(checkbox => {
             checkbox.checked = mathTopics.includes(checkbox.value);
-            const label = checkbox.closest('.checkbox-label');
-            if (checkbox.checked) {
-                label.classList.add('selected');
-            } else {
-                label.classList.remove('selected');
-            }
         });
     } catch (error) {
-        showModalMessage('preferencesForm', 'error', 'Failed to load preferences: ' + error.message);
+        console.error('Failed to load preferences:', error);
+        showModalMessage('preferencesForm', 'error', 'load preferences failed: ' + error.message);
     }
 }
 
@@ -43,26 +52,88 @@ async function loadUserPreferences() {
 async function savePreferences(event) {
     event.preventDefault();
     
-    const languageSelect = document.getElementById('preferredLanguage');
+    // Get selected language
+    const selectedLanguage = document.querySelector('input[name="language"]:checked');
+    const language = selectedLanguage ? selectedLanguage.value : 'zh';
+    
+    // Get selected math topics
     const mathTopicsCheckboxes = document.querySelectorAll('input[name="mathTopics"]:checked');
     
     const preferences = {
-        preferred_language: languageSelect.value,
+        preferred_language: language,
         math_topics: Array.from(mathTopicsCheckboxes).map(cb => cb.value)
     };
     
     try {
         const response = await window.updatePreferences(preferences);
         if (response && response.success) {
-            showModalMessage('preferencesForm', 'success', 'Preferences updated successfully!');
+            // 显示成功消息在更明显的位置
+            const prefBody = document.querySelector('.preferences-body');
+            showSuccessMessage(prefBody, 'preferences updated!');
+            
+            // 设置合理的延迟关闭模态框
             setTimeout(() => {
                 closeModal('preferencesModal');
-            }, 1500);
+            }, 500);
         } else {
-            showModalMessage('preferencesForm', 'error', response.error || 'Update failed');
+            showModalMessage('preferencesForm', 'error', response.error || 'update failed');
         }
     } catch (error) {
-        showModalMessage('preferencesForm', 'error', 'Update failed: ' + error.message);
+        console.error('Preference update error:', error);
+        showModalMessage('preferencesForm', 'error', 'update failed: ' + error.message);
+    }
+}
+
+// 专门用于显示成功消息的函数
+function showSuccessMessage(container, message) {
+    // 清除可能已存在的消息
+    const existingMessage = container.querySelector('.message');
+    if (existingMessage) {
+        existingMessage.remove();
+    }
+    
+    // 创建成功消息元素
+    const messageDiv = document.createElement('div');
+    messageDiv.className = 'message success-message';
+    messageDiv.textContent = message;
+    
+    // 插入到内容区
+    container.appendChild(messageDiv);
+    
+    // 设置定时器，3.5秒后消失
+    setTimeout(() => {
+        if (messageDiv.parentNode) {
+            // 添加淡出动画
+            messageDiv.style.opacity = '0';
+            
+            setTimeout(() => {
+                if (messageDiv.parentNode) {
+                    messageDiv.remove();
+                }
+            }, 500);
+        }
+    }, 2000);
+}
+
+// 主题切换函数
+function applyTheme(theme) {
+    const themeToggleFunction = window.applyTheme || (window.toggleTheme && (() => window.toggleTheme()));
+    
+    // 如果当前主题与选择的不同，则切换
+    const currentTheme = localStorage.getItem('theme') || 'light';
+    if (currentTheme !== theme && themeToggleFunction) {
+        themeToggleFunction(theme);
+        
+        // 更新主题预览样式
+        document.querySelectorAll('.theme-preview').forEach(preview => {
+            preview.style.borderColor = 'transparent';
+            preview.style.transform = 'none';
+        });
+        const activeThemePreview = document.querySelector(`.${theme}-preview`);
+        if (activeThemePreview) {
+            activeThemePreview.style.borderColor = 'var(--accent-color)';
+            activeThemePreview.style.transform = 'scale(1.05)';
+        }
     }
 }
 
@@ -80,8 +151,18 @@ function showModalMessage(formId, type, message) {
     form.appendChild(messageDiv);
     
     setTimeout(() => {
-        messageDiv.remove();
-    }, 3000);
+        if (messageDiv.parentNode) {
+            // 添加淡出动画
+            messageDiv.style.opacity = '0';
+            messageDiv.style.transform = 'translateY(-10px)';
+            
+            setTimeout(() => {
+                if (messageDiv.parentNode) {
+                    messageDiv.remove();
+                }
+            }, 500);
+        }
+    }, 3500);
 }
 
 // Close modal

@@ -1,0 +1,305 @@
+/* Light Theme - Using wcburgess color palette */
+
+:root {
+    /* 主要颜色变量 */
+    --bg-color: #fafafa;
+    --container-bg: #e4e5f1;
+    --border-color: #d2d3db;
+    --text-secondary: #9394a5;
+    --text-primary: #484b6a;
+    
+    /* 功能性颜色 */
+    --accent-color: #6d71a1;
+    --hover-color: #8286b5;
+    --btn-text: #ffffff;
+    --input-bg: #ffffff;
+    --input-border: #d2d3db;
+    --input-text: #484b6a;
+    --input-placeholder: #9394a5;
+    --box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    --modal-backdrop: rgba(72, 75, 106, 0.5);
+    
+    /* 状态颜色 */
+    --success-color: #4caf50;
+    --error-color: #f44336;
+    --warning-color: #ff9800;
+    --info-color: #6d71a1;
+    --message-bg: #ffffff;
+    --link-color: var(--accent-color);
+  }
+  
+  /* 基本样式 */
+  body {
+    background-color: var(--bg-color);
+    color: var(--text-primary);
+  }
+  
+  /* 侧边栏样式 */
+  .sidebar {
+    background-color: var(--container-bg);
+    border-color: var(--border-color);
+  }
+  
+  .chat-item {
+    background-color: var(--message-bg);
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    margin-bottom: 5px;
+  }
+  
+  .chat-title {
+    color: var(--text-primary);
+  }
+  
+  .chat-item:hover {
+    background-color: #edeef6;
+  }
+  
+  .new-chat-btn {
+    background-color: var(--accent-color);
+    color: var(--btn-text);
+  }
+  
+  .new-chat-btn:hover {
+    background-color: var(--hover-color);
+  }
+  
+  /* 导航栏和头部按钮 */
+  .sidebar-toggle,
+  .header-new-chat-btn {
+    background-color: var(--accent-color);
+    color: var(--btn-text);
+  }
+  
+  .sidebar-toggle:hover,
+  .header-new-chat-btn:hover {
+    background-color: var(--hover-color);
+  }
+  
+  /* 聊天区域样式 */
+  .chat-header {
+    background-color: var(--accent-color);
+    color: var(--btn-text);
+  }
+  
+  .chat-messages {
+    background-color: var(--bg-color);
+  }
+  
+  .user-message {
+    background-color: var(--accent-color);
+    color: white;
+  }
+  
+  .bot-message {
+    background-color: #ffffff;
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
+    box-shadow: var(--box-shadow);
+  }
+  
+  .chat-input-container {
+    background-color: var(--container-bg);
+  }
+  
+  .chat-input {
+    background-color: var(--input-bg);
+    border: 1px solid var(--input-border);
+  }
+  
+  #messageInput {
+    background-color: var(--input-bg);
+    color: var(--input-text);
+  }
+  
+  .send-button {
+    color: var(--accent-color);
+  }
+  
+  .send-button:hover {
+    color: var(--hover-color);
+  }
+  
+  /* 欢迎文本颜色 */
+  .welcome-container p {
+    color: var(--text-secondary);
+  }
+  
+  .typewriter {
+    color: var(--text-primary);
+  }
+  
+  /* 模态框样式 */
+  .modal-content {
+    background-color: #ffffff;
+    color: var(--text-primary);
+    border-color: var(--border-color);
+    box-shadow: var(--box-shadow);
+  }
+  
+  .modal-content h2 {
+    color: var(--text-primary);
+  }
+  
+  .profile-form input,
+  .profile-form select,
+  .profile-form textarea {
+    background-color: var(--input-bg);
+    color: var(--input-text);
+    border: 1px solid var(--input-border);
+  }
+  
+  .profile-form input:focus,
+  .profile-form select:focus,
+  .profile-form textarea:focus {
+    border-color: var(--accent-color);
+    box-shadow: 0 0 0 2px rgba(109, 113, 161, 0.2);
+  }
+  
+  .profile-form button {
+    background-color: var(--accent-color);
+    color: var(--btn-text);
+  }
+  
+  .profile-form button:hover {
+    background-color: var(--hover-color);
+  }
+  
+  /* 按钮样式 */
+  button,
+  .btn,
+  .btn-primary {
+    background-color: var(--accent-color);
+    color: var(--btn-text);
+    border: none;
+  }
+  
+  button:hover,
+  .btn:hover,
+  .btn-primary:hover {
+    background-color: var(--hover-color);
+  }
+  
+  /* 用户菜单样式 */
+  .user-menu-content {
+    background-color: #ffffff;
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
+    box-shadow: var(--box-shadow);
+  }
+  
+  .user-menu-item {
+    color: var(--text-primary);
+  }
+  
+  .user-menu-item:hover {
+    background-color: #edeef6;
+  }
+  
+  .user-menu-button {
+    color: var(--text-primary);
+  }
+  
+  /* 退出按钮颜色 */
+  .user-menu-item.logout {
+    color: var(--error-color);
+  }
+  
+  /* 标签和表单元素 */
+  label {
+    color: var(--text-primary);
+  }
+  
+  .input-help {
+    color: var(--text-secondary);
+  }
+  
+  /* 标签页和选择器 */
+  .tab {
+    color: var(--text-secondary);
+  }
+  
+  .tab.active {
+    color: var(--accent-color);
+    border-bottom: 2px solid var(--accent-color);
+  }
+  
+  .checkbox-label {
+    background-color: #edeef6;
+  }
+  
+  .checkbox-label:hover {
+    background-color: #dcdde8;
+  }
+  
+  .checkbox-label input[type="checkbox"]:checked + span {
+    color: var(--accent-color);
+  }
+  
+  .checkbox-label.selected {
+    background-color: rgba(109, 113, 161, 0.1);
+    border: 1px solid var(--accent-color);
+  }
+  
+  /* 滚动条样式 */
+  ::-webkit-scrollbar-track {
+    background: #edeef6;
+  }
+  
+  ::-webkit-scrollbar-thumb {
+    background: #c5c7d6;
+  }
+  
+  ::-webkit-scrollbar-thumb:hover {
+    background: #9394a5;
+  }
+  
+  /* 文档和文件链接 */
+  .message-content a[href$=".pdf"],
+  .message-content a[href$=".doc"],
+  .message-content a[href$=".docx"],
+  .message-content a[href$=".txt"],
+  .message-content a[href$=".xlsx"],
+  .message-content a[href$=".xls"] {
+    background-color: #edeef6;
+    color: var(--accent-color);
+  }
+  
+  .message-content a[href$=".pdf"]:hover,
+  .message-content a[href$=".doc"]:hover,
+  .message-content a[href$=".docx"]:hover,
+  .message-content a[href$=".txt"]:hover,
+  .message-content a[href$=".xlsx"]:hover,
+  .message-content a[href$=".xls"]:hover {
+    background-color: #dcdde8;
+  }
+  
+  /* 主题切换按钮 */
+  .theme-toggle {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    background-color: var(--accent-color);
+    color: var(--btn-text);
+    border: none;
+    border-radius: 50%;
+    width: 48px;
+    height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 1000;
+    box-shadow: var(--box-shadow);
+    transition: background-color 0.3s ease;
+  }
+  
+  .theme-toggle:hover {
+    background-color: var(--hover-color);
+  }
+  
+  .theme-toggle svg {
+    width: 24px;
+    height: 24px;
+  }

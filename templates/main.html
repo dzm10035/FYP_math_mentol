@@ -4,12 +4,14 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>MathMentor - Home</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/theme-vars.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <script src="{{ url_for('static', filename='js/theme.js') }}"></script>
     <style>
         .hero {
             text-align: center;
             padding: 50px 20px;
-            background-color: #f8f9fa;
+            background-color: var(--container-bg);
         }
         .features {
             display: grid;
@@ -20,20 +22,44 @@
         .feature-card {
             padding: 20px;
             border-radius: 8px;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            box-shadow: var(--box-shadow);
             text-align: center;
+            background-color: var(--input-bg);
         }
         .cta-button {
             display: inline-block;
             padding: 12px 24px;
-            background-color: #007bff;
-            color: white;
+            background-color: var(--accent-color);
+            color: var(--btn-text);
             text-decoration: none;
             border-radius: 5px;
             margin-top: 20px;
         }
         .cta-button:hover {
-            background-color: #0056b3;
+            background-color: var(--hover-color);
+        }
+        
+        /* 主题切换按钮 */
+        .theme-toggle {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background-color: var(--accent-color);
+            color: var(--btn-text);
+            border: none;
+            border-radius: 50%;
+            width: 48px;
+            height: 48px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            z-index: 1000;
+            box-shadow: var(--box-shadow);
+        }
+        
+        .theme-toggle:hover {
+            background-color: var(--hover-color);
         }
     </style>
 </head>
@@ -58,6 +84,24 @@
             <p>Each student is unique. Our system will adjust the explanation and difficulty based on your learning level, understanding speed, and mastery. Make learning more targeted and effective.</p>
         </div>
     </div>
+    
+    <!-- 主题切换按钮 -->
+    <button class="theme-toggle" id="themeToggle" title="切换暗色模式">
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="moon-icon">
+            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+        </svg>
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="sun-icon" style="display:none;">
+            <circle cx="12" cy="12" r="5"></circle>
+            <line x1="12" y1="1" x2="12" y2="3"></line>
+            <line x1="12" y1="21" x2="12" y2="23"></line>
+            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+            <line x1="1" y1="12" x2="3" y2="12"></line>
+            <line x1="21" y1="12" x2="23" y2="12"></line>
+            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+        </svg>
+    </button>
 </body>
 </html>
 

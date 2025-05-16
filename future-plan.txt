@@ -1,0 +1,8 @@
+#css
+[已完成] 添加暗色模式UI (2023-06-21)
+
+#technical
+add support file document upload and photo
+improve prompt word
+user choose math topic 
+graph display (example quadrartic equation can show in graph)
