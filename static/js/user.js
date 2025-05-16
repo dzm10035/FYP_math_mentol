@@ -9,16 +9,32 @@ function showPreferences() {
     });
 }
 
+// 处理语言变化并更新数学主题
+function handleLanguageChange(lang) {
+    // 重新加载数学主题
+    loadMathTopics();
+}
+
+// 从API获取并更新数学主题的翻译
+async function updateMathTopics(lang) {
+    // 这个函数已被loadMathTopics替代，保留以兼容旧代码
+    await loadMathTopics();
+}
+
 // Load user preferences
 async function loadUserPreferences() {
     try {
+        // 1. 先加载数学主题
+        await loadMathTopics();
+        
+        // 2. 获取用户偏好设置
         const data = await window.getUserPreferences();
         if (!data || !data.success) return;
         
         currentPreferences = data.preferences;
         
         // Fill language selection
-        const language = currentPreferences.language || 'zh';
+        const language = currentPreferences.language || 'en';
         const languageRadio = document.getElementById(`lang-${language}`);
         if (languageRadio) {
             languageRadio.checked = true;
@@ -35,16 +51,73 @@ async function loadUserPreferences() {
             activeThemePreview.style.transform = 'scale(1.05)';
         }
         
-        // Fill math topics selection
+        // 选中用户已保存的数学主题
         const mathTopics = currentPreferences.math_topics || [];
-        const checkboxes = document.querySelectorAll('input[name="mathTopics"]');
-        
-        checkboxes.forEach(checkbox => {
-            checkbox.checked = mathTopics.includes(checkbox.value);
+        mathTopics.forEach(topic => {
+            const checkbox = document.getElementById(`topic-${topic}`);
+            if (checkbox) {
+                checkbox.checked = true;
+                // 添加选中样式
+                const topicChip = checkbox.closest('.topic-chip');
+                if (topicChip) {
+                    topicChip.classList.add('selected');
+                }
+            }
         });
     } catch (error) {
         console.error('Failed to load preferences:', error);
         showModalMessage('preferencesForm', 'error', 'load preferences failed: ' + error.message);
+    }
+}
+
+// 初始化加载数学主题
+async function loadMathTopics() {
+    try {
+        // 获取当前语言，默认为英文
+        const language = document.querySelector('input[name="language"]:checked')?.value || 'en';
+        
+        // 获取数学主题
+        const response = await fetch(`/api/math_topics/${language}`);
+        if (!response.ok) {
+            throw new Error('Failed to load math topics');
+        }
+        
+        const mathTopics = await response.json();
+        
+        // 生成主题选择HTML
+        const topicsGrid = document.querySelector('.topics-grid');
+        if (!topicsGrid) return;
+        
+        // 清空现有内容
+        topicsGrid.innerHTML = '';
+        
+        // 动态生成主题选择项
+        Object.entries(mathTopics).forEach(([topicKey, topicName]) => {
+            const topicChip = document.createElement('div');
+            topicChip.className = 'topic-chip';
+            
+            topicChip.innerHTML = `
+                <input type="checkbox" id="topic-${topicKey}" name="mathTopics" value="${topicKey}">
+                <label for="topic-${topicKey}">${topicName}</label>
+            `;
+            
+            topicsGrid.appendChild(topicChip);
+            
+            // 添加选择事件
+            const checkbox = topicChip.querySelector('input[type="checkbox"]');
+            if (checkbox) {
+                checkbox.addEventListener('change', () => {
+                    if (checkbox.checked) {
+                        topicChip.classList.add('selected');
+                    } else {
+                        topicChip.classList.remove('selected');
+                    }
+                });
+            }
+        });
+        
+    } catch (error) {
+        console.error('Failed to load math topics:', error);
     }
 }
 
@@ -54,7 +127,7 @@ async function savePreferences(event) {
     
     // Get selected language
     const selectedLanguage = document.querySelector('input[name="language"]:checked');
-    const language = selectedLanguage ? selectedLanguage.value : 'zh';
+    const language = selectedLanguage ? selectedLanguage.value : 'en';
     
     // Get selected math topics
     const mathTopicsCheckboxes = document.querySelectorAll('input[name="mathTopics"]:checked');
@@ -86,33 +159,55 @@ async function savePreferences(event) {
 
 // 专门用于显示成功消息的函数
 function showSuccessMessage(container, message) {
-    // 清除可能已存在的消息
-    const existingMessage = container.querySelector('.message');
-    if (existingMessage) {
-        existingMessage.remove();
+    if (!container) {
+        console.error('Container element not found for success message');
+        return;
     }
+    
+    // 清除可能已存在的消息
+    const existingMessages = document.querySelectorAll('.success-message');
+    existingMessages.forEach(msg => {
+        if (msg.parentNode) {
+            msg.parentNode.removeChild(msg);
+        }
+    });
     
     // 创建成功消息元素
     const messageDiv = document.createElement('div');
-    messageDiv.className = 'message success-message';
+    messageDiv.className = 'form-message success-message';
     messageDiv.textContent = message;
+    messageDiv.style.position = 'fixed';
+    messageDiv.style.zIndex = '2100';
+    messageDiv.style.top = '50%';
+    messageDiv.style.left = '50%';
+    messageDiv.style.transform = 'translate(-50%, -50%)';
+    messageDiv.style.width = '300px';
+    messageDiv.style.padding = '20px';
+    messageDiv.style.backgroundColor = 'rgba(34, 139, 34, 0.9)';
+    messageDiv.style.color = '#ddd';
+    messageDiv.style.textAlign = 'center';
+    messageDiv.style.borderRadius = '8px';
+    messageDiv.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.2)';
+    messageDiv.style.animation = 'popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards';
     
-    // 插入到内容区
-    container.appendChild(messageDiv);
+    // 插入到body中，而不是容器中，避免溢出问题
+    document.body.appendChild(messageDiv);
     
-    // 设置定时器，3.5秒后消失
+    // 设置定时器，2秒后消失
     setTimeout(() => {
         if (messageDiv.parentNode) {
             // 添加淡出动画
             messageDiv.style.opacity = '0';
+            messageDiv.style.transform = 'translate(-50%, -70%)';
+            messageDiv.style.transition = 'opacity 0.5s ease, transform 0.5s ease';
             
             setTimeout(() => {
                 if (messageDiv.parentNode) {
-                    messageDiv.remove();
+                    messageDiv.parentNode.removeChild(messageDiv);
                 }
-            }, 500);
+            }, 0);
         }
-    }, 2000);
+    }, 500);
 }
 
 // 主题切换函数
@@ -140,13 +235,13 @@ function applyTheme(theme) {
 // Show modal message
 function showModalMessage(formId, type, message) {
     const form = document.getElementById(formId);
-    const existingMessage = form.querySelector('.message');
+    const existingMessage = form.querySelector('.form-message');
     if (existingMessage) {
         existingMessage.remove();
     }
     
     const messageDiv = document.createElement('div');
-    messageDiv.className = `message ${type}-message`;
+    messageDiv.className = `form-message ${type}-message`;
     messageDiv.textContent = message;
     form.appendChild(messageDiv);
     
@@ -176,30 +271,82 @@ function showProfile() {
 }
 
 // Update personal information
-async function updateProfile(event) {
-    event.preventDefault();
+function updateProfile(event) {
+    // 基本的事件处理
+    if (event) {
+        event.preventDefault();
+    }
     
+    // 获取表单数据
     const username = document.getElementById('profileUsername').value;
     const email = document.getElementById('profileEmail').value;
     
-    try {
-        const response = await window.updateProfile({
-            username,
-            email
-        });
-        
-        if (response && response.success) {
-            showModalMessage('profileForm', 'success', 'Profile updated successfully!');
-            setTimeout(() => {
-                closeModal('profileModal');
-            }, 1500);
-        } else {
-            showModalMessage('profileForm', 'error', response.error || 'Update failed');
-        }
-    } catch (error) {
-        console.error('Profile update error:', error);
-        showModalMessage('profileForm', 'error', 'Update failed: ' + error.message);
+    // 禁用提交按钮
+    const submitButton = document.querySelector('#profileForm button[type="submit"]');
+    if (submitButton) {
+        submitButton.disabled = true;
+        submitButton.textContent = 'Saving...';
     }
+    
+    // 使用普通的XMLHttpRequest而不是window.updateProfile
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', '/api/update-profile', true);
+    xhr.setRequestHeader('Content-Type', 'application/json');
+    
+    xhr.onload = function() {
+        if (submitButton) {
+            submitButton.disabled = false;
+            submitButton.textContent = 'Save Changes';
+        }
+        
+        if (xhr.status === 200) {
+            try {
+                const response = JSON.parse(xhr.responseText);
+                if (response.success) {
+                    // 显示成功消息
+                    showSuccessMessage(document.body, 'Profile updated successfully!');
+                    
+                    // 更新用户名显示
+                    const userMenuButton = document.querySelector('.user-menu-button span');
+                    if (userMenuButton) {
+                        userMenuButton.textContent = username;
+                    }
+                    
+                    // 设置合理的延迟关闭模态框
+                    setTimeout(() => {
+                        const modal = document.getElementById('profileModal');
+                        if (modal) {
+                            modal.classList.remove('active');
+                        }
+                    }, 500);
+                } else {
+                    // 显示简单的错误信息
+                    alert(response.error || 'Update failed');
+                }
+            } catch (e) {
+                alert('Invalid response from server');
+            }
+        } else if (xhr.status === 401) {
+            alert('Session expired, please log in again');
+            window.location.href = '/auth';
+        } else {
+            alert('Failed to update profile');
+        }
+    };
+    
+    xhr.onerror = function() {
+        if (submitButton) {
+            submitButton.disabled = false;
+            submitButton.textContent = 'Save Changes';
+        }
+        alert('Network error, please try again');
+    };
+    
+    // 发送请求
+    xhr.send(JSON.stringify({
+        username: username,
+        email: email
+    }));
 }
 
 // Show change password modal
@@ -209,10 +356,15 @@ function showChangePassword() {
 
 // Change password
 async function changePassword(event) {
+    if (!event || typeof event.preventDefault !== 'function') {
+        console.error('Invalid event object');
+        return;
+    }
+    
     event.preventDefault();
     
     const currentPassword = document.getElementById('currentPassword').value;
-    const newPassword = document.getElementById('newPassword').value;
+    const newPassword = document.getElementById('newPassword').value || document.querySelector('input[name="newpassword"]').value;
     const confirmNewPassword = document.getElementById('confirmNewPassword').value;
     
     if (newPassword !== confirmNewPassword) {
@@ -227,15 +379,33 @@ async function changePassword(event) {
         });
         
         if (response && response.success) {
-            showModalMessage('passwordForm', 'success', 'Password changed successfully!');
-            setTimeout(() => {
-                closeModal('passwordModal');
-            }, 1500);
-            
-            // Clear form
-            document.getElementById('currentPassword').value = '';
-            document.getElementById('newPassword').value = '';
-            document.getElementById('confirmNewPassword').value = '';
+            // 使用正确的容器选择器
+            const passwordBody = document.querySelector('#passwordModal .modal-content');
+            if (passwordBody) {
+                showSuccessMessage(passwordBody, 'Password changed successfully!');
+                
+                // 清空表单字段
+                document.getElementById('currentPassword').value = '';
+                if (document.querySelector('input[name="newpassword"]')) {
+                    document.querySelector('input[name="newpassword"]').value = '';
+                }
+                if (document.getElementById('newPassword')) {
+                    document.getElementById('newPassword').value = '';
+                }
+                document.getElementById('confirmNewPassword').value = '';
+                
+                // 设置合理的延迟关闭模态框
+                setTimeout(() => {
+                    closeModal('passwordModal');
+                }, 1500);
+            } else {
+                console.error('Password modal content not found');
+                // 备用方案
+                showModalMessage('passwordForm', 'success', 'Password changed successfully!');
+                setTimeout(() => {
+                    closeModal('passwordModal');
+                }, 1500);
+            }
         } else {
             showModalMessage('passwordForm', 'error', response.error || 'Password change failed');
         }
@@ -256,6 +426,9 @@ document.addEventListener('DOMContentLoaded', function() {
     // Add personal information form submission event
     const profileForm = document.getElementById('profileForm');
     if (profileForm) {
+        // 移除所有现有的submit事件监听器，确保不会重复绑定
+        profileForm.removeEventListener('submit', updateProfile);
+        // 添加一个新的监听器
         profileForm.addEventListener('submit', updateProfile);
     }
     
@@ -340,6 +513,16 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Initialize password toggles
     initPasswordToggles();
+    
+    // 添加语言选择变化事件处理
+    const languageOptions = document.querySelectorAll('input[name="language"]');
+    languageOptions.forEach(option => {
+        option.addEventListener('change', function() {
+            if (this.checked) {
+                handleLanguageChange(this.value);
+            }
+        });
+    });
 });
 
 // Export functions for global use

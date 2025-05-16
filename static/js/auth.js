@@ -38,7 +38,7 @@ function showMessage(message, type = 'error') {
         
         // 创建新消息元素
         const messageElement = document.createElement('div');
-        messageElement.className = `message ${type}`;
+        messageElement.className = `form-message ${type}`;
         messageElement.textContent = message;
         messageElement.style.display = 'block';
         

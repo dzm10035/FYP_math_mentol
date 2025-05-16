@@ -290,17 +290,45 @@ async function handleSendMessage() {
         messageInput.value = '';
         messageInput.style.height = 'auto'; // Reset height
         
-        // Display loading state
-        const loadingDiv = document.createElement('div');
-        loadingDiv.className = 'message-wrapper bot-message-wrapper';
-        loadingDiv.innerHTML = '<div class="message bot-message">Thinking...</div>';
-        chatMessages.appendChild(loadingDiv);
+        // 创建一个包含新加载动画的消息
+        const wrapperDiv = document.createElement('div');
+        wrapperDiv.className = 'message-wrapper bot-message-wrapper';
+        
+        const messageDiv = document.createElement('div');
+        messageDiv.className = 'message bot-message';
+        
+        const contentDiv = document.createElement('div');
+        contentDiv.className = 'message-content';
+        
+        // 使用新的加载动画
+        contentDiv.innerHTML = `
+            <div style="text-align: center;">
+                <div class="loader-dots">
+                    <div></div>
+                    <div></div>
+                    <div></div>
+                </div>
+            </div>
+        `;
+        
+        messageDiv.appendChild(contentDiv);
+        wrapperDiv.appendChild(messageDiv);
+        chatMessages.appendChild(wrapperDiv);
+        
+        // 滚动到底部
+        const chatContainer = document.querySelector('.chat-container');
+        if (chatContainer) {
+            const scrollTarget = chatContainer.scrollHeight - 100;
+            chatContainer.scrollTop = scrollTarget;
+        }
         
         // Send request
         const response = await window.sendMessage(currentSessionId, message);
         
-        // Remove loading state
-        loadingDiv.remove();
+        // 移除加载动画消息
+        if (wrapperDiv.parentNode) {
+            wrapperDiv.parentNode.removeChild(wrapperDiv);
+        }
         
         if (!response) return;
         

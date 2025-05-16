@@ -140,7 +140,7 @@ body {
 /* 模态框样式 */
 .modal-content,
 .modal-content * {
-    background-color: var(--modal-bg);
+    /* background-color: var(--modal-bg); */
     color: var(--text-primary);
     border-color: var(--border-color);
 }

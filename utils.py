@@ -11,7 +11,7 @@ def get_language_name(lang_code):
     }
     return language_map.get(lang_code, 'Please respond to the user in English')
 
-def get_topic_name(topic_code, lang_code='zh'):
+def get_topic_name(topic_code, lang_code='en'):
     """get topic name based on topic code and language code"""
     topics_map = {
         'zh': {
@@ -43,12 +43,12 @@ def get_topic_name(topic_code, lang_code='zh'):
         }
     }
     
-    # if language code does not exist, use English as default
-    if lang_code not in topics_map:
-        lang_code = 'en'
-        
-    # if topic code does not exist, return original code
-    return topics_map[lang_code].get(topic_code, topic_code)
+    lang_topics = topics_map.get(lang_code, topics_map['en'])
+
+    if topic_code is None:
+        return lang_topics
+
+    return lang_topics.get(topic_code, topic_code)
 
 def get_welcome_message(lang_code="en"):
     """

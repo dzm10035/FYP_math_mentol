@@ -11,7 +11,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const sunIcon = themeToggle.querySelector('.sun-icon');
     
     // 检查CSS版本，用于刷新缓存
-    const CSS_VERSION = '1.1';
+    const CSS_VERSION = '1.2';
     const cachedVersion = localStorage.getItem('css-version');
     
     // 如果版本不匹配，清除主题缓存

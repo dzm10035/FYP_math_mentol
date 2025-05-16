@@ -10,6 +10,7 @@ from functools import wraps
 from routes.admin import admin_bp
 from routes.upload import create_upload_routes
 from database import users_collection, sessions_collection, messages_collection
+from utils import get_topic_name
 
 # Load environment variables first
 load_dotenv()
@@ -129,6 +130,12 @@ def create_app():
     app.register_blueprint(chat_bp)
     app.register_blueprint(admin_bp)
     app.register_blueprint(upload_bp)
+    
+    # API endpoint to get math topics in specified language
+    @app.route('/api/math_topics/<lang_code>', methods=['GET'])
+    def get_math_topics(lang_code):
+        math_topics = get_topic_name(None, lang_code)
+        return jsonify(math_topics)
     
     # add 404 error handler
     @app.errorhandler(404)

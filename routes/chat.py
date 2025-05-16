@@ -280,9 +280,9 @@ def create_chat_routes(sessions_collection, messages_collection, client, gmt8, l
             system_message["content"] += f"\n\n{get_language_name(preferred_language)}."
             
             # Add math topics if available
-            if math_topics and len(math_topics) > 0:
-                topics_string = ", ".join([get_topic_name(topic, preferred_language) for topic in math_topics])
-                system_message["content"] += f"\nThe user is particularly interested in these math topics: {topics_string}."
+            # if math_topics and len(math_topics) > 0:
+            #     topics_string = ", ".join([get_topic_name(topic, preferred_language) for topic in math_topics])
+            #     system_message["content"] += f"\nThe user is particularly interested in these math topics: {topics_string}."
             
             messages_collection.insert_one({
                 "message_id": f"{session_id}_1",

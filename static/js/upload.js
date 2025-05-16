@@ -129,16 +129,16 @@ function addFilePreview(file, localPreviewUrl) {
     const attachmentId = `attachment-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
     previewElement.setAttribute('data-attachment-id', attachmentId);
     
-    // 计算此附件的序号
+    // calculate the index of this attachment
     const attachmentIndex = pendingUploads.length + 1;
     
     // 根据文件类型生成预览内容
     if (fileType === 'image') {
         previewElement.innerHTML = `
             <div class="image-preview-container">
-                <img src="${localPreviewUrl}" alt="附件-${attachmentIndex}" class="preview-image">
-                <span class="attachment-label">附件-${attachmentIndex}</span>
-                <button class="remove-attachment" title="删除">&times;</button>
+                <img src="${localPreviewUrl}" alt="Attachment ${attachmentIndex}" class="preview-image">
+                <span class="attachment-label">Attachment-${attachmentIndex}</span>
+                <button class="remove-attachment" title="delete">&times;</button>
             </div>
         `;
     } else {
@@ -153,8 +153,8 @@ function addFilePreview(file, localPreviewUrl) {
                 <div class="document-icon" style="background-color: ${iconColor}">
                     <span>${file.name.split('.').pop().toUpperCase()}</span>
                 </div>
-                <span class="attachment-label">附件-${attachmentIndex}</span>
-                <button class="remove-attachment" title="删除">&times;</button>
+                <span class="attachment-label">Attachment-${attachmentIndex}</span>
+                <button class="remove-attachment" title="delete">&times;</button>
             </div>
         `;
     }
@@ -207,7 +207,7 @@ function updateAttachmentLabels() {
     document.querySelectorAll('.attachment-preview').forEach((element, index) => {
         const label = element.querySelector('.attachment-label');
         if (label) {
-            label.textContent = `附件-${index + 1}`;
+            label.textContent = `Attachment-${index + 1}`;
         }
         
         // 同时更新pendingUploads中的索引
@@ -230,7 +230,7 @@ async function uploadAllPendingFiles() {
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
             <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" stroke-dasharray="32" stroke-dashoffset="10"></circle>
         </svg>
-        <span>上传中 (0/${pendingUploads.length})</span>
+        <span>Uploading (0/${pendingUploads.length})</span>
     `;
     document.body.appendChild(progressIndicator);
     
@@ -248,50 +248,51 @@ async function uploadAllPendingFiles() {
             const item = sortedUploads[i];
             
             // 更新进度
-            progressText.textContent = `上传中 (${uploadedCount}/${sortedUploads.length})`;
+            if (progressText) {
+                progressText.textContent = `Uploading (${uploadedCount}/${pendingUploads.length})`;
+            }
             
             try {
                 const result = await uploadFile(item.file);
+                uploadedCount++;
                 
-                if (result && result.success) {
-                    // 添加到markdown文本，使用预设的附件编号
-                    if (item.type === 'image') {
-                        markdownTexts.push(`![附件-${item.index}](${result.file_url})`);
-                    } else {
-                        markdownTexts.push(`[附件-${item.index}](${result.file_url})`);
-                    }
-                    
-                    // 将本地URL替换为服务器URL（可选）
-                    if (item.element.querySelector('img')) {
-                        item.element.querySelector('img').src = result.file_url;
-                    }
-                    
-                    uploadedCount++;
+                // 添加到markdown文本，使用预设的附件编号
+                if (item.type === 'image') {
+                    markdownTexts.push(`![Attachment-${item.index}](${result.file_url})`);
+                } else {
+                    markdownTexts.push(`[Attachment-${item.index}](${result.file_url})`);
                 }
             } catch (error) {
-                console.error(`上传文件 "${item.file.name}" 失败:`, error);
-                // 继续上传其他文件
+                console.error(`Upload failed for item ${item.index}:`, error);
             }
         }
         
-        if (uploadedCount === 0) {
-            alert('所有文件上传失败');
-            return '';
-        } else if (uploadedCount < sortedUploads.length) {
-            alert(`成功上传了 ${uploadedCount}/${sortedUploads.length} 个文件`);
+        // 移除上传进度指示器
+        if (progressIndicator.parentNode) {
+            progressIndicator.parentNode.removeChild(progressIndicator);
         }
         
-        // 清空待上传队列
-        pendingUploads.length = 0;
+        // 清除预览区域
+        const previewArea = document.querySelector('.attachments-preview-area');
+        if (previewArea) {
+            previewArea.innerHTML = '';
+            previewArea.remove();
+        }
+        
+        // 清空待上传文件列表
+        pendingUploads.splice(0, pendingUploads.length);
         
         // 返回markdown文本，用于插入到消息中
         return markdownTexts.join(' ');
     } catch (error) {
-        alert(`上传出错: ${error.message}`);
+        console.error('Upload failed:', error);
+        
+        // 移除上传进度指示器
+        if (progressIndicator.parentNode) {
+            progressIndicator.parentNode.removeChild(progressIndicator);
+        }
+        
         return '';
-    } finally {
-        // 移除进度指示器
-        progressIndicator.remove();
     }
 }
 
@@ -386,8 +387,8 @@ async function handleSendWithUploads(e) {
             chatHandleSendMessage();
         }
     } catch (error) {
-        console.error('发送附件消息失败:', error);
-        alert('发送消息失败，请重试');
+        console.error('send message with attachments failed:', error);
+        alert('send message failed, please try again');
     } finally {
         // 恢复按钮状态
         if (sendButton) {
