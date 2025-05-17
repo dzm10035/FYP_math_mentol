@@ -501,7 +501,7 @@ body {
 }
 
 .math-block:hover {
-    background-color: rgba(235, 242, 250, 0.8);
+    background-color: rgba(119, 139, 161, 0.568);
     box-shadow: 0 2px 5px rgba(0, 0, 0, 0.08);
     transition: all 0.3s ease;
 }
@@ -526,6 +526,9 @@ body {
     overflow-y: hidden;
 }
 
+.katex, .katex * {
+    font-family: 'KaTeX_Main', 'Times New Roman', serif !important;
+}
 /* Mobile responsive */
 @media (max-width: 768px) {
     .sidebar {
