@@ -387,11 +387,16 @@ async function handleDeleteChat(sessionId) {
                     currentSessionId = null;
                     // Show welcome interface
                     chatMessages.innerHTML = `
-                        <div class="welcome-container" style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 60vh;">
+                        <div class="welcome-container" style="display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 60vh; padding-bottom: 20px;">
                             <h1 class="typewriter">What can MathMentor help with?</h1>
-                            <p style="color: #666; font-size: 1.1rem;">Ask anything about math...</p>
+                            <p class="welcome-subtitle" style="color: #666; font-size: 1.1rem; margin-top: 10px;">Ask anything about math, or pick a topic to start:</p>
+                            <div id="suggestionCardsContainer" class="suggestion-cards-grid" style="margin-top: 20px; display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; width: 100%; max-width: 800px;">
+                                <!-- Suggestion cards will be dynamically inserted here -->
+                            </div>
                         </div>
                     `;
+                    // Load and render suggestion cards
+                    await loadAndRenderSuggestionCards();
                 }
             } else {
                 addMessage('Error: ' + data.error, false);

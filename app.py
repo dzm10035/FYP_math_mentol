@@ -30,19 +30,13 @@ def login_required(f):
     return decorated_function
 
 # Load system message from rule.json
-def load_system_message(file_path="rule.json", lang_code=None):
-    """Load system message from rule.json based on language code"""
-    try:
-        with open(file_path, "r", encoding="utf-8") as file:
-            data = json.load(file)
-            if lang_code == "zh" and "system_message_zh" in data:
-                return {"role": "system", "content": data["system_message_zh"]}
-            elif lang_code == "ms" and "system_message_ms" in data:
-                return {"role": "system", "content": data["system_message_ms"]}
-            else:
-                return {"role": "system", "content": data["system_message_en"]}
-    except FileNotFoundError:
-        return {"role": "system", "content": "You are MathMentor, a virtual math assistant designed to help learners understand mathematical concepts step-by-step. Always provide detailed explanations, encourage critical thinking, and adapt to the user's knowledge level."}
+import json
+
+def load_system_message(file_path="rule.json"):
+    """Load system message from rule.json (single-language simplified version)."""
+    with open(file_path, "r", encoding="utf-8") as file:
+        data = json.load(file)
+    return {"role": "system", "content": data.get("system_message_en", "")}
 
 # Ensure indexes for performance
 def setup_indexes():

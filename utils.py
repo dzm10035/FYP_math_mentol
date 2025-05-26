@@ -21,7 +21,15 @@ def get_topic_name(topic_code, lang_code='en'):
             'statistics': '统计',
             'probability': '概率论',
             'linear_algebra': '线性代数',
-            'discrete_math': '离散数学'
+            'discrete_math': '离散数学',
+            'trigonometry': '三角学',
+            'number_theory': '数论',
+            'functions': '函数',
+            'ratios_proportions': '比例与比率',
+            'percentages': '百分数',
+            'equations': '方程与不等式',
+            'matrices': '矩阵',
+            'vectors': '向量'
         },
         'en': {
             'algebra': 'Algebra',
@@ -30,7 +38,15 @@ def get_topic_name(topic_code, lang_code='en'):
             'statistics': 'Statistics',
             'probability': 'Probability',
             'linear_algebra': 'Linear Algebra',
-            'discrete_math': 'Discrete Mathematics'
+            'discrete_math': 'Discrete Mathematics',
+            'trigonometry': 'Trigonometry',
+            'number_theory': 'Number Theory',
+            'functions': 'Functions',
+            'ratios_proportions': 'Ratios and Proportions',
+            'percentages': 'Percentages',
+            'equations': 'Equations and Inequalities',
+            'matrices': 'Matrices',
+            'vectors': 'Vectors'
         },
         'ms': {
             'algebra': 'Algebra',
@@ -39,10 +55,18 @@ def get_topic_name(topic_code, lang_code='en'):
             'statistics': 'Statistik',
             'probability': 'Kebarangkalian',
             'linear_algebra': 'Aljabar Linear',
-            'discrete_math': 'Matematik Diskret'
+            'discrete_math': 'Matematik Diskret',
+            'trigonometry': 'Trigonometri',
+            'number_theory': 'Teori Nombor',
+            'functions': 'Fungsi',
+            'ratios_proportions': 'Nisbah dan Kadar',
+            'percentages': 'Peratusan',
+            'equations': 'Persamaan dan Ketaksamaan',
+            'matrices': 'Matriks',
+            'vectors': 'Vektor'
         }
     }
-    
+
     lang_topics = topics_map.get(lang_code, topics_map['en'])
 
     if topic_code is None:

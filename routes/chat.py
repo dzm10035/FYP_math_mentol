@@ -274,7 +274,7 @@ def create_chat_routes(sessions_collection, messages_collection, client, gmt8, l
             logger.info(f"Created new session: {session_id}")
             
             # Add system message with language and topic preferences
-            system_message = load_system_message(lang_code=preferred_language)
+            system_message = load_system_message()
             
             # Add language preference to system message
             system_message["content"] += f"\n\n{get_language_name(preferred_language)}."
