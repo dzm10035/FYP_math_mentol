@@ -148,6 +148,27 @@ def create_app():
     def index():
         return render_template('index.html')
     
+    # protected chat route for specific session
+    @app.route('/<session_id>')
+    @login_required
+    def chat_session(session_id):
+        # Validate session_id format (should start with 'chat_')
+        if not session_id.startswith('chat_'):
+            return render_template('404.html'), 404
+        
+        # Check if session exists and belongs to current user
+        user_id = session.get('user_id')
+        session_data = sessions_collection.find_one({
+            "session_id": session_id,
+            "user_id": user_id
+        })
+        
+        if not session_data:
+            # If session doesn't exist or doesn't belong to user, redirect to home
+            return redirect(url_for('index'))
+        
+        return render_template('index.html', current_session_id=session_id)
+    
     return app
 
 if __name__ == '__main__':

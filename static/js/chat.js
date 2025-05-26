@@ -8,6 +8,16 @@ const newChatButton = document.querySelector('.new-chat-btn');
 const headerNewChatBtn = document.getElementById('headerNewChatBtn');
 const chatList = document.getElementById('chat-list');
 
+// Helper function to extract session ID from URL
+function getSessionIdFromURL() {
+    const path = window.location.pathname;
+    // Check if path starts with /chat_ (session ID format)
+    if (path.startsWith('/chat_')) {
+        return path.substring(1); // Remove leading slash
+    }
+    return null;
+}
+
 // Main initialization
 document.addEventListener('DOMContentLoaded', async () => {
     // 初始化侧边栏切换按钮
@@ -28,6 +38,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         this.style.height = (this.scrollHeight) + 'px';
     });
     
+    // Get session ID from URL
+    const sessionIdFromURL = getSessionIdFromURL();
+    if (sessionIdFromURL) {
+        currentSessionId = sessionIdFromURL;
+    }
+    
     // Load session list
     try {
         await loadChatSessionList();
@@ -35,8 +51,13 @@ document.addEventListener('DOMContentLoaded', async () => {
         console.error('Failed to load chat sessions:', error);
     }
     
-    // Load and render suggestion cards
-    await loadAndRenderSuggestionCards();
+    // If there's a session ID from URL, load that chat
+    if (currentSessionId) {
+        await handleLoadChat(currentSessionId);
+    } else {
+        // Load and render suggestion cards only if no specific session
+        await loadAndRenderSuggestionCards();
+    }
 });
 
 // 初始化侧边栏切换功能
@@ -192,7 +213,7 @@ async function loadChatSessionList() {
             itemDiv.appendChild(titleSpan);
             itemDiv.appendChild(actionsDiv);
             
-            // Click to load chat
+            // Click to load chat - navigate to URL
             itemDiv.addEventListener('click', function(e) {
                 if (e.target.closest('.more-btn') || e.target.closest('.more-menu')) {
                     return;
@@ -202,7 +223,8 @@ async function loadChatSessionList() {
                     menu.classList.remove('active');
                 });
                 
-                handleLoadChat(session.session_id);
+                // Navigate to the chat URL
+                window.location.href = '/' + session.session_id;
             });
             
             chatList.appendChild(itemDiv);
@@ -273,6 +295,10 @@ async function handleSendMessage() {
                 throw new Error('Failed to create new chat session');
             }
             currentSessionId = data.session_id;
+            
+            // Update URL without refreshing page
+            window.history.pushState({ sessionId: currentSessionId }, '', '/' + currentSessionId);
+            
             await loadChatSessionList();
             
             // Clear welcome screen
@@ -361,9 +387,8 @@ async function handleNewChat() {
         if (!data) return;
         
         if (data.success) {
-            currentSessionId = data.session_id;
-            await loadChatSessionList();
-            handleLoadChat(currentSessionId);
+            // Navigate to the new chat URL
+            window.location.href = '/' + data.session_id;
         } else {
             addMessage('Error: ' + data.error, false);
         }
@@ -383,20 +408,8 @@ async function handleDeleteChat(sessionId) {
             if (data.success) {
                 await loadChatSessionList();
                 if (currentSessionId === sessionId) {
-                    // Reset current session ID
-                    currentSessionId = null;
-                    // Show welcome interface
-                    chatMessages.innerHTML = `
-                        <div class="welcome-container" style="display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 60vh; padding-bottom: 20px;">
-                            <h1 class="typewriter">What can MathMentor help with?</h1>
-                            <p class="welcome-subtitle" style="color: #666; font-size: 1.1rem; margin-top: 10px;">Ask anything about math, or pick a topic to start:</p>
-                            <div id="suggestionCardsContainer" class="suggestion-cards-grid" style="margin-top: 20px; display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; width: 100%; max-width: 800px;">
-                                <!-- Suggestion cards will be dynamically inserted here -->
-                            </div>
-                        </div>
-                    `;
-                    // Load and render suggestion cards
-                    await loadAndRenderSuggestionCards();
+                    // Navigate back to home page
+                    window.location.href = '/';
                 }
             } else {
                 addMessage('Error: ' + data.error, false);

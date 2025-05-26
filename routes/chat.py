@@ -256,7 +256,7 @@ def create_chat_routes(sessions_collection, messages_collection, client, gmt8, l
             
             # Generate session ID and default title
             current_time = datetime.now(gmt8)
-            session_id = f"chat_{current_time.timestamp()}"
+            session_id = f"chat_{current_time.timestamp()}".replace(".", "_")
             formatted_time = current_time.strftime("%Y%m%d-%H:%M")
             default_title = f"Chat {formatted_time}"
             
