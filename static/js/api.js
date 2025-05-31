@@ -1,12 +1,17 @@
 // API functions for server communication
 
 // Create a new chat session
-async function createNewChat() {
+async function createNewChat(topicId = null) {
     try {
+        const requestBody = {};
+        if (topicId) {
+            requestBody.topic_id = topicId;
+        }
+        
         const response = await fetch('/api/new-session', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({})
+            body: JSON.stringify(requestBody)
         });
         
         if (response.status === 401) {

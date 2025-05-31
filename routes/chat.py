@@ -4,7 +4,7 @@ import logging
 from pymongo.mongo_client import MongoClient
 from pymongo.collection import ObjectId
 from functools import wraps
-from utils import get_language_name, get_topic_name, get_welcome_message
+from utils import get_language_name, get_topic_name, get_welcome_message, get_available_topics, get_topic_confirmation_message
 
 logger = logging.getLogger(__name__)
 
@@ -49,7 +49,6 @@ def create_chat_routes(sessions_collection, messages_collection, client, gmt8, l
             
             # Extract user preferences
             preferred_language = user_preferences.get('language', 'en')
-            math_topics = user_preferences.get('math_topics', [])
             
             logger.info(f"Processing chat request, session ID: {session_id}, preferred language: {preferred_language}")
             
@@ -108,12 +107,44 @@ def create_chat_routes(sessions_collection, messages_collection, client, gmt8, l
             # Call OpenAI API
             try:
                 logger.info("Calling GPT API...")
-                completion = client.chat.completions.create(
-                    model="gpt-4o",
-                    messages=messages,
-                    temperature=0.7,
-                )
-                assistant_message = completion.choices[0].message.content
+                
+                # Prepare function calling if no topic is set
+                api_params = {
+                    "model": "gpt-4o",
+                    "messages": messages,
+                    "temperature": 0.7,
+                }
+                 # Check if session has topic set
+                current_topic = session_data.get("topic_id")
+                if not current_topic:
+                    api_params["tools"] = tools_schema
+                    api_params["tool_choice"] = "auto"
+                    logger.info("Using tools to detect topic.")
+                
+                completion = client.chat.completions.create(**api_params)
+                
+                # Handle function call response
+                tool_call  = None
+                if completion.choices[0].message.tool_calls:
+                    tool_call = completion.choices[0].message.tool_calls[0] 
+                    if tool_call.function.name == "set_current_topic":
+                        import json
+                        function_args = json.loads(tool_call.function.arguments)
+                        function_call_topic = function_args.get("topic_id")
+                        logger.info(f"AI detected topic: {function_call_topic}")
+
+                        # Update session    
+                        sessions_collection.update_one(
+                            {"session_id": session_id},
+                            {"$set": {"topic_id": function_call_topic}}
+                        )
+                        logger.info(f"Updated session {session_id} with topic: {function_call_topic}")
+
+                        topic_name = get_topic_name(function_call_topic, preferred_language)
+                        assistant_message = get_topic_confirmation_message(topic_name, preferred_language)
+                else:
+                    assistant_message = completion.choices[0].message.content
+                
                 next_sequence += 1
                 logger.info("GPT API call successful")
             except Exception as api_error:
@@ -216,6 +247,7 @@ def create_chat_routes(sessions_collection, messages_collection, client, gmt8, l
                     "_id": 0,  # Do not return MongoDB's _id field
                     "session_id": 1,
                     "title": 1,
+                    "topic_id": 1,  # Include topic information
                     "created_at": 1,
                     "updated_at": 1,
                     "message_count": 1
@@ -245,6 +277,9 @@ def create_chat_routes(sessions_collection, messages_collection, client, gmt8, l
                 logger.error("No user_id found in session")
                 return jsonify({"error": "User not logged in"}), 401
             
+            # Get optional topic_id from request (when user clicks topic card)
+            topic_id = request.json.get('topic_id') if request.json else None
+            
             # Get user preferences
             from database import users_collection
             user_data = users_collection.find_one({"_id": ObjectId(user_id)})
@@ -252,7 +287,7 @@ def create_chat_routes(sessions_collection, messages_collection, client, gmt8, l
             preferred_language = user_preferences.get("language", "en")
             math_topics = user_preferences.get("math_topics", [])
                 
-            logger.info(f"Creating new session for user: {user_id}, language: {preferred_language}")
+            logger.info(f"Creating new session for user: {user_id}, language: {preferred_language}, topic: {topic_id}")
             
             # Generate session ID and default title
             current_time = datetime.now(gmt8)
@@ -265,6 +300,7 @@ def create_chat_routes(sessions_collection, messages_collection, client, gmt8, l
                 "session_id": session_id,
                 "user_id": user_id,
                 "title": default_title,
+                "topic_id": topic_id,  # Add topic field, can be None initially
                 "created_at": current_time,
                 "updated_at": current_time,
                 "message_count": 2  # System message and welcome message
@@ -279,11 +315,11 @@ def create_chat_routes(sessions_collection, messages_collection, client, gmt8, l
             # Add language preference to system message
             system_message["content"] += f"\n\n{get_language_name(preferred_language)}."
             
-            # Add math topics if available
-            # if math_topics and len(math_topics) > 0:
-            #     topics_string = ", ".join([get_topic_name(topic, preferred_language) for topic in math_topics])
-            #     system_message["content"] += f"\nThe user is particularly interested in these math topics: {topics_string}."
-            
+            # Add topic-specific instructions if topic is provided
+            if topic_id:
+                topic_name = get_topic_name(topic_id, preferred_language)
+                system_message["content"] += f"\nThe user has selected the topic: {topic_name}. Focus your assistance on this mathematical area."
+ 
             messages_collection.insert_one({
                 "message_id": f"{session_id}_1",
                 "session_id": session_id,
@@ -359,4 +395,47 @@ def create_chat_routes(sessions_collection, messages_collection, client, gmt8, l
             logger.error(f"Error updating title: {str(e)}")
             return jsonify({"error": f"Failed to update title: {str(e)}"}), 500
             
-    return chat_bp 
+    def set_current_topic(session_id, topic_id):
+        """Helper function to set topic for a session"""
+        try:
+            sessions_collection.update_one(
+                {"session_id": session_id},
+                {"$set": {"topic_id": topic_id}}
+            )
+            logger.info(f"Set topic {topic_id} for session {session_id}")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to set topic: {str(e)}")
+            return False
+            
+    return chat_bp
+
+    # def get_user_progression(user_id):
+    #     return
+     
+    # def update_user_progression(user_id, progression):
+    #     return  
+
+# topic tools schema
+tools_schema = [
+    {
+        "type": "function",
+        "function": {
+            "name": "set_current_topic",
+            "description": (
+                "Set the topic for the current session based on the user's message. "
+                "Choose ONLY from the provided list, and do not create new topics."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "topic_id": {
+                        "type": "string",
+                        "enum": get_available_topics()
+                    }
+                },
+                "required": ["topic_id"]
+            }
+        }
+    }
+]  

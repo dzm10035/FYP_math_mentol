@@ -29,14 +29,14 @@ def login_required(f):
         return f(*args, **kwargs)
     return decorated_function
 
-# Load system message from rule.json
+# Load system prompt
 import json
 
-def load_system_message(file_path="rule.json"):
-    """Load system message from rule.json (single-language simplified version)."""
+def load_system_message(file_path="rule.md"):
+    """Load system message from rule.md."""
     with open(file_path, "r", encoding="utf-8") as file:
-        data = json.load(file)
-    return {"role": "system", "content": data.get("system_message_en", "")}
+        data = file.read()
+    return {"role": "system", "content": data}
 
 # Ensure indexes for performance
 def setup_indexes():

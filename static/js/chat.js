@@ -55,7 +55,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (currentSessionId) {
         await handleLoadChat(currentSessionId);
     } else {
-        // Load and render suggestion cards only if no specific session
+        // Only show welcome interface if no session ID
         await loadAndRenderSuggestionCards();
     }
 });
@@ -256,6 +256,7 @@ async function handleLoadChat(sessionId) {
         const messages = await window.loadChat(sessionId);
         if (!messages) return;
         
+        // Load chat messages
         chatMessages.innerHTML = '';
         
         messages.forEach(msg => {
@@ -318,6 +319,12 @@ async function handleSendMessage() {
         addMessage(message, true);
         messageInput.value = '';
         messageInput.style.height = 'auto'; // Reset height
+        
+        // Hide welcome container if it's still visible
+        const welcomeContainer = document.querySelector('.welcome-container');
+        if (welcomeContainer) {
+            welcomeContainer.style.display = 'none';
+        }
         
         // 创建一个包含新加载动画的消息
         const wrapperDiv = document.createElement('div');
@@ -617,11 +624,38 @@ function toggleSidebar() {
 }
 
 async function loadAndRenderSuggestionCards() {
+    // Don't show suggestion cards if we're currently in a chat session
+    if (currentSessionId) {
+        console.log('Currently in a chat session, not showing suggestion cards');
+        return;
+    }
+    
     const suggestionContainer = document.getElementById('suggestionCardsContainer');
-    const welcomeContainer = document.querySelector('.welcome-container');
+    let welcomeContainer = document.querySelector('.welcome-container');
 
-    if (!suggestionContainer || !welcomeContainer || welcomeContainer.style.display === 'none') {
-        // If the welcome container isn't there or is hidden, don't try to render cards.
+    // If welcome container doesn't exist, create it
+    if (!welcomeContainer) {
+        const chatMessages = document.getElementById('chatMessages');
+        chatMessages.innerHTML = `
+            <div class="welcome-container" style="display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 60vh; padding-bottom: 20px;">
+                <h1 class="typewriter">What can MathMentor help with?</h1>
+                <p class="welcome-subtitle" style="color: #666; font-size: 1.1rem; margin-top: 10px;">Ask anything about math, or pick a topic to start:</p>
+                <div id="suggestionCardsContainer" class="suggestion-cards-grid" style="margin-top: 20px; display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; width: 100%; max-width: 800px;">
+                    <!-- Suggestion cards will be dynamically inserted here -->
+                </div>
+            </div>
+        `;
+        welcomeContainer = document.querySelector('.welcome-container');
+    } else {
+        // Make sure welcome container is visible
+        welcomeContainer.style.display = 'flex';
+    }
+
+    // Get the suggestion container again after potential recreation
+    const updatedSuggestionContainer = document.getElementById('suggestionCardsContainer');
+    
+    if (!updatedSuggestionContainer || !welcomeContainer) {
+        console.error('Could not find or create welcome container elements');
         return;
     }
 
@@ -684,7 +718,7 @@ async function loadAndRenderSuggestionCards() {
         if (Object.keys(allTopics).length === 0) {
             const subtitle = welcomeContainer.querySelector('.welcome-subtitle');
             if(subtitle) subtitle.textContent = currentCardTranslations.askAnythingOnly;
-            suggestionContainer.innerHTML = '';
+            updatedSuggestionContainer.innerHTML = '';
             return;
         }
 
@@ -702,7 +736,7 @@ async function loadAndRenderSuggestionCards() {
             topicsToDisplay = allTopics;
         }
         
-        suggestionContainer.innerHTML = ''; 
+        updatedSuggestionContainer.innerHTML = ''; 
 
         if (Object.keys(topicsToDisplay).length > 0) {
             const subtitle = welcomeContainer.querySelector('.welcome-subtitle');
@@ -714,17 +748,49 @@ async function loadAndRenderSuggestionCards() {
                 card.textContent = topicName;
                 card.setAttribute('role', 'button');
                 card.setAttribute('tabindex', '0');
-                card.addEventListener('click', () => {
-                    const message = `${currentCardTranslations.iWouldLikeToLearn} ${topicName}`;
-                    messageInput.value = message; 
-                    handleSendMessage(); 
+                card.addEventListener('click', async () => {
+                    try {
+                        // If no current session, create a new one with topic
+                        if (!currentSessionId) {
+                            const data = await window.createNewChat(topicKey);
+                            if (!data || !data.success) {
+                                throw new Error('Failed to create new chat session');
+                            }
+                            currentSessionId = data.session_id;
+                            
+                            // Update URL without refreshing page
+                            window.history.pushState({ sessionId: currentSessionId }, '', '/' + currentSessionId);
+                            
+                            await loadChatSessionList();
+                            
+                            // Set active status in sidebar
+                            document.querySelectorAll('.chat-item').forEach(item => {
+                                item.classList.remove('active');
+                            });
+                            const activeItem = document.querySelector(`.chat-item[data-session-id="${currentSessionId}"]`);
+                            if (activeItem) {
+                                activeItem.classList.add('active');
+                            }
+                        }
+                        
+                        // Send the "I want to learn" message
+                        const message = `${currentCardTranslations.iWouldLikeToLearn} ${topicName}`;
+                        messageInput.value = message;
+                        await handleSendMessage();
+                        
+                    } catch (error) {
+                        console.error('Failed to handle topic card click:', error);
+                        // Fallback: just set the message
+                        const message = `${currentCardTranslations.iWouldLikeToLearn} ${topicName}`;
+                        messageInput.value = message;
+                    }
                 });
                 card.addEventListener('keypress', (e) => {
                     if (e.key === 'Enter' || e.key === ' ') {
                         card.click();
                     }
                 });
-                suggestionContainer.appendChild(card);
+                updatedSuggestionContainer.appendChild(card);
             });
         } else {
             const subtitle = welcomeContainer.querySelector('.welcome-subtitle');
@@ -736,7 +802,7 @@ async function loadAndRenderSuggestionCards() {
         const subtitle = welcomeContainer.querySelector('.welcome-subtitle');
         // Fallback to a very basic message on error
         if(subtitle) subtitle.textContent = cardSpecificTranslations.en.askAnythingOnly; 
-        if(suggestionContainer) suggestionContainer.innerHTML = ''; 
+        if(updatedSuggestionContainer) updatedSuggestionContainer.innerHTML = ''; 
     }
 }
 
