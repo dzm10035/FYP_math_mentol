@@ -356,9 +356,10 @@ def create_auth_routes(users_collection, gmt8, reset_tokens_collection):
                 return jsonify({"error": "missing necessary parameters"}), 400
                 
             # 验证令牌
+            current_time = datetime.now(gmt8)
             token_data = reset_tokens_collection.find_one({
                 "token": token,
-                "expiry": {"$gt": datetime.utcnow()}
+                "expiry": {"$gt": current_time}
             })
             
             if not token_data:

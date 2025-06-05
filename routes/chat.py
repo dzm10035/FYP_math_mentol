@@ -1,6 +1,7 @@
 from flask import jsonify, request, session
 from datetime import datetime
 import logging
+import pytz
 from pymongo.mongo_client import MongoClient
 from pymongo.collection import ObjectId
 from functools import wraps
@@ -37,6 +38,95 @@ def create_chat_routes(sessions_collection, messages_collection, client, gmt8, l
     from routes import create_chat_blueprint
     chat_bp = create_chat_blueprint()
     
+    def add_progression_context(messages, user_id, topic_id, preferred_language, users_collection):
+        """Add progression context as sequence 0 (dynamic, not saved to DB)"""
+        # Get user data for preferences
+        user_data = users_collection.find_one({"_id": ObjectId(user_id)})
+        user_preferences = user_data.get("preferences", {}) if user_data else {}
+        
+        if topic_id:
+            # Specific topic - provide progression for this topic
+            progression_data = get_user_topic_progression(user_id, topic_id, users_collection)
+            if progression_data:
+                progress_message = {
+                    "role": "system", 
+                    "content": (
+                        f"User has previously studied topic '{topic_id}' with progress {progression_data['progress']}%. "
+                        f"{'They have completed this topic. So can focus on revision.' if progression_data.get('revision', False) else 'The topic is not yet complete.'} "
+                        f"Last studied at {progression_data['last_study_time']}. "
+                        f"Notes: {progression_data.get('notes', 'None')}."
+                    )
+                }
+                messages.insert(0, progress_message)
+                logger.info(f"Added progression context for topic {topic_id}")
+            else:
+                # User has no previous progression for this topic - first time learning
+                topic_name = get_topic_name(topic_id, preferred_language)
+                progress_message = {
+                    "role": "system",
+                    "content": (
+                        f"This is the user's first time studying the topic '{topic_name}' (ID: {topic_id}). "
+                        f"Start with fundamental concepts and build up gradually. "
+                        f"Assess their current understanding before diving into advanced topics."
+                    )
+                }
+                messages.insert(0, progress_message)
+                logger.info(f"Added first-time learning context for topic {topic_id}")
+        else:
+            # No topic - provide both progression history and preferences for comprehensive context
+            all_progressions = get_all_user_progressions(user_id, users_collection)
+            math_topics = user_preferences.get("math_topics", [])
+            
+            context_parts = []
+            
+            if all_progressions:
+                progression_summary = "User's mathematics learning history:\n"
+                for prog in all_progressions:
+                    topic_name = get_topic_name(prog.get('id'), preferred_language)
+                    status = "Mastered" if prog.get('revision', False) else f"{prog.get('progress', 0)}% progress"
+                    progression_summary += f"• {topic_name}: {status}\n"
+                context_parts.append(progression_summary)
+            
+            if math_topics:
+                preferences_summary = "User's selected mathematical interests:\n"
+                for topic_id in math_topics:
+                    topic_name = get_topic_name(topic_id, preferred_language)
+                    preferences_summary += f"• {topic_name}\n"
+                context_parts.append(preferences_summary)
+            
+            if context_parts:
+                # User has progression history and/or preferences
+                combined_context = "\n".join(context_parts)
+                combined_context += "\nBased on the user's learning history and interests, recommend the most logical next topic or suggest review areas. "
+                combined_context += "Consider prerequisite relationships between topics and identify knowledge gaps. "
+                combined_context += "Remember: Guidelines contain template examples (like quadratic equations) - adapt all teaching to the recommended topic."
+                
+                progress_message = {
+                    "role": "system",
+                    "content": combined_context
+                }
+                messages.insert(0, progress_message)
+                logger.info(f"Added combined progression and preferences context (progressions: {len(all_progressions)}, preferences: {len(math_topics)})")
+            else:
+                # No history or preferences - provide all available topics for reference
+                all_topics = get_available_topics()
+                topics_summary = "Available mathematics topics for new learner (no history or preferences):\n"
+                for topic_id in all_topics:
+                    topic_name = get_topic_name(topic_id, preferred_language)
+                    topics_summary += f"• {topic_name}\n"
+                
+                progress_message = {
+                    "role": "system",
+                    "content": (
+                        topics_summary + 
+                        "Assess user's mathematical background and recommend appropriate starting topics based on their goals and current knowledge. "
+                        "Key reminder: All teaching examples in guidelines (like quadratic equations) are templates only - "
+                        "create topic-specific examples and explanations relevant to whatever subject you're teaching."
+                    )
+                }
+                messages.insert(0, progress_message)
+                logger.info("Added all available topics for recommendation")
+
     @chat_bp.route('/api/chat', methods=['POST'])
     @auth_required
     def chat():
@@ -74,6 +164,11 @@ def create_chat_routes(sessions_collection, messages_collection, client, gmt8, l
                 {"_id": 0, "role": 1, "content": 1}
             ).sort("sequence", 1))
             logger.info(f"Found {len(messages)} history messages")
+            
+            # Check if session has topic set and add progression context
+            current_topic = session_data.get("topic_id")
+            from database import users_collection
+            add_progression_context(messages, user_id, current_topic, preferred_language, users_collection)
             
             # Get current message sequence number
             current_sequence = session_data.get("message_count", 0)
@@ -115,11 +210,30 @@ def create_chat_routes(sessions_collection, messages_collection, client, gmt8, l
                     "temperature": 0.7,
                 }
                  # Check if session has topic set
-                current_topic = session_data.get("topic_id")
                 if not current_topic:
                     api_params["tools"] = tools_schema
                     api_params["tool_choice"] = "auto"
                     logger.info("Using tools to detect topic.")
+                elif current_topic:
+                    # Add progression tools for existing topic
+                    progression_tools = get_progression_tools_schema(current_topic)
+                    api_params["tools"] = progression_tools
+                    api_params["tool_choice"] = "auto"
+                    logger.info(f"Using progression tools for topic: {current_topic}")
+                    
+                    # Add explicit tool instruction to messages
+                    tool_instruction = {
+                        "role": "system",
+                        "content": (
+                            f"You are currently teaching topic '{current_topic}'. "
+                            "After meaningful learning interactions (when the user shows understanding, "
+                            "completes problems, or demonstrates progress), use the update_user_progression tool "
+                            "to track their learning progress. Consider using it if the user successfully "
+                            "solves problems, grasps concepts, or makes learning breakthroughs."
+                        )
+                    }
+                    messages.append(tool_instruction)
+                
                 
                 completion = client.chat.completions.create(**api_params)
                 
@@ -127,23 +241,118 @@ def create_chat_routes(sessions_collection, messages_collection, client, gmt8, l
                 tool_call  = None
                 if completion.choices[0].message.tool_calls:
                     tool_call = completion.choices[0].message.tool_calls[0] 
+                    
+                    # Add the assistant's tool call message to conversation
+                    messages.append({
+                        "role": "assistant",
+                        "content": completion.choices[0].message.content,
+                        "tool_calls": completion.choices[0].message.tool_calls
+                    })
+                    
                     if tool_call.function.name == "set_current_topic":
                         import json
                         function_args = json.loads(tool_call.function.arguments)
                         function_call_topic = function_args.get("topic_id")
                         logger.info(f"AI detected topic: {function_call_topic}")
 
-                        # Update session    
+                        # 更新 session 中的 topic
                         sessions_collection.update_one(
                             {"session_id": session_id},
                             {"$set": {"topic_id": function_call_topic}}
                         )
                         logger.info(f"Updated session {session_id} with topic: {function_call_topic}")
 
+                        # Add tool response to messages
                         topic_name = get_topic_name(function_call_topic, preferred_language)
-                        assistant_message = get_topic_confirmation_message(topic_name, preferred_language)
+                        tool_response = f"Topic successfully set to '{topic_name}' for this session."
+                        messages.append({
+                            "role": "tool",
+                            "tool_call_id": tool_call.id,
+                            "content": tool_response
+                        })
+                        
+                    elif tool_call.function.name == "update_user_progression":
+                        import json
+                        function_args = json.loads(tool_call.function.arguments)
+                        topic_id = function_args.get("topic_id")
+                        progress = function_args.get("progress")
+                        notes = function_args.get("notes", "")
+                        
+                        logger.info(f"AI updating progression for topic {topic_id}: {progress}%")
+                        
+                        # Check if current session has the topic set
+                        if current_topic != topic_id:
+                            logger.warning(f"Topic mismatch: session topic {current_topic}, tool topic {topic_id}")
+                            tool_response = "Error: Topic mismatch. Could not update progression."
+                        else:
+                            # Update user progression
+                            from database import users_collection
+                            success = update_user_topic_progression(user_id, topic_id, progress, notes, users_collection)
+                            
+                            if success:
+                                logger.info(f"Successfully updated progression for user {user_id}, topic {topic_id}")
+                                tool_response = f"User progression updated successfully: {progress}% completion for topic '{topic_id}'."
+                            else:
+                                logger.error(f"Failed to update progression for user {user_id}, topic {topic_id}")
+                                tool_response = "Error: Failed to update user progression."
+                        
+                        # Add tool response to messages
+                        messages.append({
+                            "role": "tool",
+                            "tool_call_id": tool_call.id,
+                            "content": tool_response
+                        })
+                        
+                    else:
+                        logger.warning(f"Unknown tool call function: {tool_call.function.name}")
+                        # Add error response to messages
+                        messages.append({
+                            "role": "tool",
+                            "tool_call_id": tool_call.id,
+                            "content": "Error: Unknown function called."
+                        })
+                    
+                    # Make second API call to get GPT's response based on tool results
+                    try:
+                        # Add a guidance message for the second call to ensure GPT responds appropriately
+                        if tool_call.function.name == "update_user_progression":
+                            # Add guidance for progression tool response
+                            messages.append({
+                                "role": "system",
+                                "content": (
+                                    "Based on the user's progress, now continue the lesson by: "
+                                    "1. Introducing the next logical concept in this topic. "
+                                    "2. Asking a follow-up question related to what they just learned to reinforce their understanding. "
+                                    "Do not mention tools or progression explicitly."
+                                )
+                            })
+                        elif tool_call.function.name == "set_current_topic":
+                            # Add guidance for topic setting response
+                            messages.append({
+                                "role": "system", 
+                                "content": (
+                                    "You have set the session topic. Now begin teaching this topic by: "
+                                    "1. Briefly introducing a basic concept or question to assess the user's familiarity. "
+                                    "2. Avoid listing subtopics; instead, choose one simple example to engage the user. "
+                                    "3. Ask the user to try something or share what they find confusing about the topic. "
+                                    "Do not mention tools or topic-setting."
+                                )
+                            })
+                        
+                        second_completion = client.chat.completions.create(
+                            model="gpt-4o",
+                            messages=messages,
+                            temperature=0.7,
+                        )
+                        assistant_message = second_completion.choices[0].message.content or "I've processed your request. How can I help you further?"
+                        logger.info("Second GPT call successful - got text response after tool execution")
+                    except Exception as second_api_error:
+                        logger.error(f"Failed second GPT API call: {str(second_api_error)}")
+                        assistant_message = "I've processed your request. How can I help you further?"
+                        
                 else:
-                    assistant_message = completion.choices[0].message.content
+                    # No tool calls, use the original response
+                    assistant_message = completion.choices[0].message.content or "I'm sorry, I didn't understand your request. Please try again."
                 
                 next_sequence += 1
                 logger.info("GPT API call successful")
@@ -207,6 +416,17 @@ def create_chat_routes(sessions_collection, messages_collection, client, gmt8, l
                 
             logger.info(f"Fetching history for session: {session_id}")
             
+            # Get session data to determine topic and user preferences
+            user_id = session.get('user_id')
+            session_data = sessions_collection.find_one({"session_id": session_id})
+            if not session_data:
+                return jsonify({"error": "Session not found"}), 404
+                
+            # Get user preferences for language
+            from database import users_collection
+            user_data = users_collection.find_one({"_id": ObjectId(user_id)})
+            preferred_language = user_data.get("preferences", {}).get("language", "en") if user_data else "en"
+            
             messages = list(messages_collection.find(
                 {"session_id": session_id},
                 {
@@ -216,6 +436,10 @@ def create_chat_routes(sessions_collection, messages_collection, client, gmt8, l
                     "created_at": 1 
                 }
             ).sort("sequence", 1))
+            
+            # Add progression context as sequence 0 (dynamic, not saved)
+            current_topic = session_data.get("topic_id")
+            add_progression_context(messages, user_id, current_topic, preferred_language, users_collection)
             
             # Convert date format to ISO string to solve JSON serialization problem
             for msg in messages:
@@ -303,7 +527,7 @@ def create_chat_routes(sessions_collection, messages_collection, client, gmt8, l
                 "topic_id": topic_id,  # Add topic field, can be None initially
                 "created_at": current_time,
                 "updated_at": current_time,
-                "message_count": 2  # System message and welcome message
+                "message_count": 0  # Will be updated after adding messages
             }
             
             sessions_collection.insert_one(session_data)
@@ -330,6 +554,9 @@ def create_chat_routes(sessions_collection, messages_collection, client, gmt8, l
             })
             logger.info("Added system message to new session")
             
+            # Note: Progression context will be handled in chat function when needed
+            # This keeps the session creation simple with only system and welcome messages
+            
             # Add welcome message based on language preference
             welcome_message = get_welcome_message(preferred_language)
             messages_collection.insert_one({
@@ -341,6 +568,12 @@ def create_chat_routes(sessions_collection, messages_collection, client, gmt8, l
                 "sequence": 2
             })
             logger.info("Added welcome message to new session")
+            
+            # Set final message count
+            sessions_collection.update_one(
+                {"session_id": session_id},
+                {"$set": {"message_count": 2}}
+            )
             
             return jsonify({"success": True, "session_id": session_id})
         except Exception as e:
@@ -409,12 +642,62 @@ def create_chat_routes(sessions_collection, messages_collection, client, gmt8, l
             return False
             
     return chat_bp
+    
+def get_user_topic_progression(user_id, topic_id, users_collection):
+    user = users_collection.find_one({"_id": ObjectId(user_id)})
+    if not user or "progression" not in user or "topics" not in user["progression"]:
+        return None
 
-    # def get_user_progression(user_id):
-    #     return
-     
-    # def update_user_progression(user_id, progression):
-    #     return  
+    for topic in user["progression"]["topics"]:
+        if topic.get("id") == topic_id:
+            return topic
+    return None  # not found
+
+def get_all_user_progressions(user_id, users_collection):
+    """Get all topic progressions for a user"""
+    user = users_collection.find_one({"_id": ObjectId(user_id)})
+    if not user or "progression" not in user or "topics" not in user["progression"]:
+        return []
+    return user["progression"]["topics"]
+
+def update_user_topic_progression(user_id, topic_id, progress, notes, users_collection):
+    # find user first
+    user = users_collection.find_one({"_id": ObjectId(user_id)})
+    if not user:
+        return False
+
+    # construct new record
+    current_time = datetime.now(pytz.timezone('Asia/Singapore'))
+    new_topic = {
+        "id": topic_id,
+        "progress": progress,
+        "revision": progress >= 100,
+        "last_study_time": current_time.isoformat(),
+        "notes": notes
+    }
+
+    # check if topic already exists
+    found = False
+    if "progression" in user and "topics" in user["progression"]:
+        for i, topic in enumerate(user["progression"]["topics"]):
+            if topic.get("id") == topic_id:
+                user["progression"]["topics"][i] = new_topic
+                found = True
+                break
+    else:
+        # initialize empty structure
+        user["progression"] = {"topics": []}
+
+    if not found:
+        user["progression"]["topics"].append(new_topic)
+
+    # update back to database
+    users_collection.update_one(
+        {"_id": ObjectId(user_id)},
+        {"$set": {"progression.topics": user["progression"]["topics"]}}
+    )
+    return True
+
 
 # topic tools schema
 tools_schema = [
@@ -439,3 +722,53 @@ tools_schema = [
         }
     }
 ]  
+
+def get_progression_tools_schema(topic_id):
+    return [
+        {
+            "type": "function",
+            "function": {
+                "name": "update_user_progression",
+                "description": (
+                    "Update the user's learning progress for the given topic. "
+                    "Call this function whenever the user engages meaningfully—asks questions, attempts answers, shows confusion, or expresses understanding. "
+                    "Do NOT call if the user's progress is already 100%."
+                ),
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "topic_id": {
+                            "type": "string",
+                            "const": topic_id,
+                            "description": f"Always use this exact topic ID: {topic_id}"
+                        },
+                        "progress": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 100,
+                            "description": (
+                                "Estimate the user's mastery level:\n"
+                                "5-15: Engaged or asked a basic question\n"
+                                "16-30: Shows early understanding\n"
+                                "31-50: Applies concepts with help\n"
+                                "51-70: Solid understanding, active attempts\n"
+                                "71-85: Solves independently, explains back\n"
+                                "86-100: Mastery level, confident and fluent\n"
+                                "Skip update if already at 100."
+                            )
+                        },
+                        "notes": {
+                            "type": "string",
+                            "description": (
+                                "Optional. Add a short note about the user's learning behavior, e.g., "
+                                "'Attempted solving quadratic equation', 'Asked a question about limits', 'Understood after clarification'."
+                            )
+                        }
+                    },
+                    "required": ["topic_id", "progress"]
+                }
+            }
+        }
+    ]
+
+

@@ -28,6 +28,8 @@ topics_map = {
         'equations': '方程与不等式',
         'matrices': '矩阵',
         'vectors': '向量',
+        'logic_thinking': '逻辑思维',
+        'complex_numbers': '复数'
     },
     'en': {
         'algebra': 'Algebra',
@@ -45,6 +47,8 @@ topics_map = {
         'equations': 'Equations and Inequalities',
         'matrices': 'Matrices',
         'vectors': 'Vectors',
+        'logic_thinking': 'Logical Thinking',
+        'complex_numbers': 'Complex Numbers'
     },
     'ms': {
         'algebra': 'Algebra',
@@ -62,6 +66,8 @@ topics_map = {
         'equations': 'Persamaan dan Ketaksamaan',
         'matrices': 'Matriks',
         'vectors': 'Vektor',
+        'logic_thinking': 'Pemikiran Logik',
+        'complex_numbers': 'Nombor Kompleks'
     }
 }
 
@@ -90,10 +96,10 @@ def get_welcome_message(lang_code="en"):
     Get welcome message based on language code
     """
     if lang_code == "zh":
-        return "你好！我是数学导师，你的虚拟数学助手。今天我能帮你解决什么问题？"
+        return "你好！我是数学导师，你的虚拟数学助手。今天你想学习什么数学知识？"
     elif lang_code == "ms":
-        return "Hai! Saya MathMentor, pembantu matematik maya anda. Bagaimana saya boleh membantu anda hari ini?"
-    return "Hi! I'm MathMentor, your virtual math assistant. How can I help you today?" 
+        return "Hai! Saya MathMentor, pembantu matematik maya anda. Hari ini anda mahu belajar apa?"
+    return "Hi! I'm MathMentor, your virtual math assistant. What would you like to learn today?" 
 
 def get_topic_confirmation_message(topic_name, lang_code='en'):
     """Return a topic confirmation message in the desired language."""
