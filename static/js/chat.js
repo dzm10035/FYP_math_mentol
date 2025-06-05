@@ -18,6 +18,63 @@ function getSessionIdFromURL() {
     return null;
 }
 
+// Auto send topic message function
+async function autoSendTopicMessage(topicId) {
+    try {
+        // Get user preferences for language - try multiple sources
+        let lang = 'en';
+        
+        // First try to get from window.currentPreferences
+        if (window.currentPreferences && window.currentPreferences.language) {
+            lang = window.currentPreferences.language;
+        } else {
+            // If not available, try to fetch user preferences
+            try {
+                const prefData = await window.getUserPreferences();
+                if (prefData && prefData.success && prefData.preferences && prefData.preferences.language) {
+                    lang = prefData.preferences.language;
+                    window.currentPreferences = prefData.preferences; // Cache for future use
+                }
+            } catch (prefError) {
+                console.warn('Could not fetch user preferences for language, using default:', prefError);
+            }
+        }
+        
+        console.log('Using language for auto-send:', lang);
+        
+        // Get topic name in the correct language
+        const response = await fetch(`/api/math_topics/${lang}`);
+        if (response.ok) {
+            const allTopics = await response.json();
+            const topicName = allTopics[topicId];
+            
+            if (topicName) {
+                // Use the same translations as in the card system
+                const translations = {
+                    en: "I would like to learn",
+                    zh: "我想学习", 
+                    ms: "Saya ingin belajar"
+                };
+                
+                const iWouldLikeToLearn = translations[lang] || translations.en;
+                const message = `${iWouldLikeToLearn} ${topicName}`;
+                
+                console.log('Auto-sending message:', message);
+                
+                // Set message and send
+                messageInput.value = message;
+                await handleSendMessage();
+            } else {
+                console.warn('Topic not found:', topicId, 'in language:', lang);
+            }
+        } else {
+            console.error('Failed to fetch topics for language:', lang);
+        }
+    } catch (error) {
+        console.error('Error auto-sending topic message:', error);
+    }
+}
+
 // Main initialization
 document.addEventListener('DOMContentLoaded', async () => {
     // 初始化侧边栏切换按钮
@@ -54,6 +111,19 @@ document.addEventListener('DOMContentLoaded', async () => {
     // If there's a session ID from URL, load that chat
     if (currentSessionId) {
         await handleLoadChat(currentSessionId);
+        
+        // 检查是否需要自动发送主题消息
+        const urlParams = new URLSearchParams(window.location.search);
+        const autoSendTopic = urlParams.get('autoSendTopic');
+        if (autoSendTopic) {
+            // 清除 URL 参数
+            window.history.replaceState({}, '', `/${currentSessionId}`);
+            
+            // 稍微延迟一下，确保所有组件都已加载
+            setTimeout(async () => {
+                await autoSendTopicMessage(autoSendTopic);
+            }, 500);
+        }
     } else {
         // Only show welcome interface if no session ID
         await loadAndRenderSuggestionCards();
@@ -809,9 +879,48 @@ async function loadAndRenderSuggestionCards() {
 // Make it globally accessible if user.js needs to refresh it (e.g., after preference save)
 window.loadAndRenderSuggestionCards = loadAndRenderSuggestionCards;
 
-// Ensure this is called in your main DOMContentLoaded or chat initialization logic
-// Example (assuming it's in DOMContentLoaded already from previous steps):
-// document.addEventListener('DOMContentLoaded', async () => {
-//     // ... other initializations ...
-//     await loadAndRenderSuggestionCards(); // Already added this line previously
-// });
+// Global event listener for /chat links
+document.addEventListener("click", async function (e) {
+    const link = e.target.closest("a[href^='/chat']");
+    if (!link) return;
+
+    const url = new URL(link.href, window.location.origin);
+    const topicId = url.searchParams.get("topic");
+    const isNew = url.searchParams.get("new");
+
+    // 我们只处理 /chat?topic=xxx 或 /chat?new=true，不拦截其他链接
+    if (!topicId && !isNew) return;
+
+    e.preventDefault(); // 阻止默认跳转
+
+    try {
+        const response = await fetch("/api/new-session", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify(topicId ? { topic_id: topicId } : {})
+        });
+
+        if (response.status === 401) {
+            alert('Session expired, please log in again');
+            window.location.href = '/auth';
+            return;
+        }
+
+        const data = await response.json();
+        if (data?.success && data.session_id) {
+            // 如果有 topicId，在 URL 中保存它，这样跳转后可以自动发送消息
+            if (topicId) {
+                window.location.href = `/${data.session_id}?autoSendTopic=${topicId}`;
+            } else {
+                window.location.href = `/${data.session_id}`;
+            }
+        } else {
+            alert(`Failed to create session: ${data?.error || 'Unknown error'}`);
+        }
+    } catch (err) {
+        console.error("Error creating session:", err);
+        alert("Network or server error.");
+    }
+});

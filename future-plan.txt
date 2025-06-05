@@ -1,5 +1,5 @@
 #technical
 add support file document upload and photo
-improve prompt word
-user choose math topic [complete50%？]
 graph display (example quadrartic equation can show in graph)
+detect user need new topic so generate a link let user click and jump to new session
+use tools maybe ，of course is detect topic not sub topic.

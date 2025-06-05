@@ -109,3 +109,34 @@ def get_topic_confirmation_message(topic_name, lang_code='en'):
         'ms': f"Saya faham anda berminat dalam {topic_name}. Bagaimana saya boleh membantu anda dengan topik ini?"
     }
     return translations.get(lang_code, translations['en'])
+
+def get_new_topic_suggestion_message(suggested_topic_id, lang_code='en'):
+    """Return a new topic suggestion message with navigation links in the desired language."""
+    # Get the localized topic name
+    localized_topic_name = get_topic_name(suggested_topic_id, lang_code)
+    
+    translations = {
+        'en': {
+            'ready': "It looks like you're ready for a new topic!",
+            'start_new': f"Start a new session on *{localized_topic_name}*",
+            'choose_own': "Or start a fresh session and choose your own topic"
+        },
+        'zh': {
+            'ready': "看起来你准备开始一个新话题了！",
+            'start_new': f"开始一个新的 *{localized_topic_name}* 学习会话",
+            'choose_own': "或者开始一个全新的会话并选择你自己的话题"
+        },
+        'ms': {
+            'ready': "Nampaknya anda sudah bersedia untuk topik baru!",
+            'start_new': f"Mulakan sesi baru untuk *{localized_topic_name}*",
+            'choose_own': "Atau mulakan sesi baru dan pilih topik anda sendiri"
+        }
+    }
+    
+    lang_trans = translations.get(lang_code, translations['en'])
+    
+    return (
+        f"{lang_trans['ready']}\n\n"
+        f"👉 [{lang_trans['start_new']}](/chat?topic={suggested_topic_id})\n"
+        f"🆕 [{lang_trans['choose_own']}](/chat?new=true)"
+    )

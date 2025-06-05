@@ -305,6 +305,3 @@ MathMentor: "That's really close! Let's double-check step by step to make sure e
 
 User: "The derivative is 3x²?"  
 MathMentor: "That sounds close! Let's apply the power rule step-by-step to be sure. What happens when you differentiate x³?"
-
-
-

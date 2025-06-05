@@ -5,7 +5,7 @@ import pytz
 from pymongo.mongo_client import MongoClient
 from pymongo.collection import ObjectId
 from functools import wraps
-from utils import get_language_name, get_topic_name, get_welcome_message, get_available_topics, get_topic_confirmation_message
+from utils import get_language_name, get_topic_name, get_welcome_message, get_available_topics, get_topic_confirmation_message, get_new_topic_suggestion_message
 
 logger = logging.getLogger(__name__)
 
@@ -213,23 +213,43 @@ def create_chat_routes(sessions_collection, messages_collection, client, gmt8, l
                 if not current_topic:
                     api_params["tools"] = tools_schema
                     api_params["tool_choice"] = "auto"
-                    logger.info("Using tools to detect topic.")
+                    logger.info("Using topic detection and new topic suggestion tools.")
                 elif current_topic:
-                    # Add progression tools for existing topic
+                    # Add progression tools and new topic suggestion tools for existing topic
                     progression_tools = get_progression_tools_schema(current_topic)
-                    api_params["tools"] = progression_tools
+                    all_tools = progression_tools + new_topic_tools
+                    api_params["tools"] = all_tools
                     api_params["tool_choice"] = "auto"
-                    logger.info(f"Using progression tools for topic: {current_topic}")
+                    logger.info(f"Using progression and new topic tools for topic: {current_topic}")
                     
                     # Add explicit tool instruction to messages
                     tool_instruction = {
                         "role": "system",
                         "content": (
-                            f"You are currently teaching topic '{current_topic}'. "
-                            "After meaningful learning interactions (when the user shows understanding, "
-                            "completes problems, or demonstrates progress), use the update_user_progression tool "
-                            "to track their learning progress. Consider using it if the user successfully "
-                            "solves problems, grasps concepts, or makes learning breakthroughs."
+                            f"You are currently teaching topic '{current_topic}'.\n\n"
+                            "🧠 Throughout the conversation, closely observe the user's learning signals. After any meaningful learning interaction, "
+                            "you must use the `update_user_progression` tool to track their progress.\n\n"
+
+                            "✅ Meaningful learning interactions include (but are not limited to):\n"
+                            "- The user correctly solves a problem or completes a calculation\n"
+                            "- The user demonstrates understanding of a concept, even partially\n"
+                            "- The user applies a method you previously explained\n"
+                            "- The user asks a thoughtful question or makes a relevant connection\n"
+                            "- The user attempts to explain, reason, or paraphrase an idea\n"
+                            "- The user moves from confusion to clarity after your guidance\n\n"
+                            "🏆 If the user answers a question correctly, always treat this as progress and award at least 1 point using the `update_user_progression` tool.\n\n"
+                            "⚠️ Do NOT wait for perfect answers. Even small improvements or signs of engagement count as progress.\n"
+                            "You are expected to proactively track and log progression after any such interaction, so the system can adapt to the user's evolving understanding."
+                            "\n\n"
+                            "If the user expresses a desire to switch to a completely different topic — e.g. by saying things like "
+                            "'I want to learn something new', 'Can we switch topics?', 'I don't want to continue this topic', "
+                            "'Let's try geometry', or similar expressions — do NOT continue with the current topic. "
+                            "Instead, call the `suggest_new_topic_session` tool with a suitable suggested topic "
+                            "based on their message or learning history. Do not teach the new topic directly in the current session. "
+                            "Only when the user's intent is to fully switch to a new **main topic** (not just a sub-area) should you "
+                            "call the `suggest_new_topic_session` tool with a suitable suggested topic based on their message or "
+                            "learning history. "
+                            "Let the frontend handle topic transition via a new session link."
                         )
                     }
                     messages.append(tool_instruction)
@@ -303,6 +323,34 @@ def create_chat_routes(sessions_collection, messages_collection, client, gmt8, l
                             "content": tool_response
                         })
                         
+                    elif tool_call.function.name == "suggest_new_topic_session":
+                        import json
+                        function_args = json.loads(tool_call.function.arguments)
+                        suggested_topic_id = function_args.get("suggested_topic_id")
+                        
+                        # Get the topic name based on the topic ID and user's language
+                        suggested_topic_name = get_topic_name(suggested_topic_id, preferred_language)
+                        
+                        logger.info(f"AI suggesting new topic session: {suggested_topic_id}")
+                        
+                        # Generate the new topic suggestion message using utils
+                        assistant_message = get_new_topic_suggestion_message(
+                            suggested_topic_id, 
+                            preferred_language
+                        )
+                        
+                        logger.info("Generated new topic suggestion message, will not store in MongoDB")
+                        
+                        # Delete the user message from MongoDB since we're not storing this GPT response
+                        messages_collection.delete_one({"message_id": user_message_id})
+                        logger.info(f"Deleted user message {user_message_id} for new topic suggestion")
+                        
+                        # Skip saving this message to MongoDB and return immediately
+                        return jsonify({
+                            "response": assistant_message,
+                            "session_id": session_id
+                        })
+                        
                     else:
                         logger.warning(f"Unknown tool call function: {tool_call.function.name}")
                         # Add error response to messages
@@ -338,7 +386,6 @@ def create_chat_routes(sessions_collection, messages_collection, client, gmt8, l
                                     "Do not mention tools or topic-setting."
                                 )
                             })
-                        
                         second_completion = client.chat.completions.create(
                             model="gpt-4o",
                             messages=messages,
@@ -721,7 +768,34 @@ tools_schema = [
             }
         }
     }
-]  
+]
+
+# new topic suggestion tools
+new_topic_tools = [
+    {
+        "type": "function",
+        "function": {
+            "name": "suggest_new_topic_session",
+            "description": (
+                "Trigger this when the user wants to start a completely new topic in a new session. "
+                "This tool should not update the current session; it just generates suggestion links. "
+                "Use this when the user says things like 'I want to learn calculus', 'Can we do geometry instead', "
+                "'Let's switch to algebra', or expresses desire to change topics completely."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "suggested_topic_id": {
+                        "type": "string",
+                        "enum": get_available_topics(),
+                        "description": "The ID of the topic GPT suggests based on user's message."
+                    }
+                },
+                "required": ["suggested_topic_id"]
+            }
+        }
+    }
+]
 
 def get_progression_tools_schema(topic_id):
     return [
