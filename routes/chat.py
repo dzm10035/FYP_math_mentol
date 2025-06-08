@@ -83,7 +83,10 @@ def create_chat_routes(sessions_collection, messages_collection, client, gmt8, l
                 progression_summary = "User's mathematics learning history:\n"
                 for prog in all_progressions:
                     topic_name = get_topic_name(prog.get('id'), preferred_language)
-                    status = "Mastered" if prog.get('revision', False) else f"{prog.get('progress', 0)}% progress"
+                    if prog.get('revision', False):
+                        status = "Mastered (excellent for revision!)"
+                    else:
+                        status = f"{prog.get('progress', 0)}% progress"
                     progression_summary += f"• {topic_name}: {status}\n"
                 context_parts.append(progression_summary)
             
@@ -97,7 +100,12 @@ def create_chat_routes(sessions_collection, messages_collection, client, gmt8, l
             if context_parts:
                 # User has progression history and/or preferences
                 combined_context = "\n".join(context_parts)
-                combined_context += "\nBased on the user's learning history and interests, recommend the most logical next topic or suggest review areas. "
+                combined_context += "\nWhen the user asks for topic recommendations, provide them with MULTIPLE options (at least 3-5 choices) rather than just one. "
+                combined_context += "Based on their learning history and interests, suggest several logical next topics, review areas, or related topics they might find interesting. "
+                combined_context += "Present the options in a clear, organized way so they can choose what appeals to them most. "
+                combined_context += "\n🔄 IMPORTANT FOR REVISION REQUESTS: If the user specifically asks about revision, review, or revisiting previous topics, "
+                combined_context += "prioritize and prominently suggest topics marked as 'Mastered' - these are completed topics perfect for revision! "
+                combined_context += "Include these mastered topics in your recommendations alongside other options. "
                 combined_context += "Consider prerequisite relationships between topics and identify knowledge gaps. "
                 combined_context += "Remember: Guidelines contain template examples (like quadratic equations) - adapt all teaching to the recommended topic."
                 
@@ -119,7 +127,9 @@ def create_chat_routes(sessions_collection, messages_collection, client, gmt8, l
                     "role": "system",
                     "content": (
                         topics_summary + 
-                        "Assess user's mathematical background and recommend appropriate starting topics based on their goals and current knowledge. "
+                        "When the user asks for topic recommendations, provide them with MULTIPLE options (at least 3-5 choices) from the available topics. "
+                        "Assess user's mathematical background and suggest several appropriate starting topics based on their goals and current knowledge. "
+                        "Present the options in a clear, organized way (such as by difficulty level or subject area) so they can choose what interests them most. "
                         "Key reminder: All teaching examples in guidelines (like quadratic equations) are templates only - "
                         "create topic-specific examples and explanations relevant to whatever subject you're teaching."
                     )
@@ -258,112 +268,92 @@ def create_chat_routes(sessions_collection, messages_collection, client, gmt8, l
                 completion = client.chat.completions.create(**api_params)
                 
                 # Handle function call response
-                tool_call  = None
-                if completion.choices[0].message.tool_calls:
-                    tool_call = completion.choices[0].message.tool_calls[0] 
-                    
-                    # Add the assistant's tool call message to conversation
+                tool_calls = completion.choices[0].message.tool_calls
+                if tool_calls:
                     messages.append({
                         "role": "assistant",
                         "content": completion.choices[0].message.content,
-                        "tool_calls": completion.choices[0].message.tool_calls
+                        "tool_calls": tool_calls
                     })
-                    
-                    if tool_call.function.name == "set_current_topic":
-                        import json
-                        function_args = json.loads(tool_call.function.arguments)
-                        function_call_topic = function_args.get("topic_id")
-                        logger.info(f"AI detected topic: {function_call_topic}")
 
-                        # 更新 session 中的 topic
-                        sessions_collection.update_one(
-                            {"session_id": session_id},
-                            {"$set": {"topic_id": function_call_topic}}
-                        )
-                        logger.info(f"Updated session {session_id} with topic: {function_call_topic}")
-
-                        # Add tool response to messages
-                        topic_name = get_topic_name(function_call_topic, preferred_language)
-                        tool_response = f"Topic successfully set to '{topic_name}' for this session."
-                        messages.append({
-                            "role": "tool",
-                            "tool_call_id": tool_call.id,
-                            "content": tool_response
-                        })
-                        
-                    elif tool_call.function.name == "update_user_progression":
-                        import json
+                    import json
+                    for tool_call in tool_calls:
                         function_args = json.loads(tool_call.function.arguments)
-                        topic_id = function_args.get("topic_id")
-                        progress = function_args.get("progress")
-                        notes = function_args.get("notes", "")
-                        
-                        logger.info(f"AI updating progression for topic {topic_id}: {progress}%")
-                        
-                        # Check if current session has the topic set
-                        if current_topic != topic_id:
-                            logger.warning(f"Topic mismatch: session topic {current_topic}, tool topic {topic_id}")
-                            tool_response = "Error: Topic mismatch. Could not update progression."
-                        else:
-                            # Update user progression
-                            from database import users_collection
-                            success = update_user_topic_progression(user_id, topic_id, progress, notes, users_collection)
+
+                        if tool_call.function.name == "set_current_topic":
+                            function_call_topic = function_args.get("topic_id")
+                            logger.info(f"AI detected topic: {function_call_topic}")
+
+                            # 更新 session 中的 topic
+                            sessions_collection.update_one(
+                                {"session_id": session_id},
+                                {"$set": {"topic_id": function_call_topic}}
+                            )
+                            logger.info(f"Updated session {session_id} with topic: {function_call_topic}")
                             
-                            if success:
-                                logger.info(f"Successfully updated progression for user {user_id}, topic {topic_id}")
-                                tool_response = f"User progression updated successfully: {progress}% completion for topic '{topic_id}'."
+                            # 🔥 重要：更新当前代码中的 current_topic 变量
+                            current_topic = function_call_topic
+                            logger.info(f"Updated current_topic variable to: {current_topic}")
+
+                            topic_name = get_topic_name(function_call_topic, preferred_language)
+                            tool_response = f"Topic successfully set to '{topic_name}' for this session."
+
+                        elif tool_call.function.name == "update_user_progression":
+                            topic_id = function_args.get("topic_id")
+                            progress = function_args.get("progress")
+                            notes = function_args.get("notes", "")
+
+                            logger.info(f"AI updating progression for topic {topic_id}: {progress}%")
+                            if current_topic != topic_id:
+                                logger.warning(f"Topic mismatch: session topic {current_topic}, tool topic {topic_id}")
+                                tool_response = "Error: Topic mismatch. Could not update progression."
                             else:
-                                logger.error(f"Failed to update progression for user {user_id}, topic {topic_id}")
-                                tool_response = "Error: Failed to update user progression."
-                        
-                        # Add tool response to messages
+                                from database import users_collection
+                                success = update_user_topic_progression(user_id, topic_id, progress, notes, users_collection)
+
+                                if success:
+                                    logger.info(f"Successfully updated progression for user {user_id}, topic {topic_id}")
+                                    tool_response = f"User progression updated successfully: {progress}% completion for topic '{topic_id}'."
+                                else:
+                                    logger.error(f"Failed to update progression for user {user_id}, topic {topic_id}")
+                                    tool_response = "Error: Failed to update user progression."
+
+                        elif tool_call.function.name == "suggest_new_topic_session":
+                            suggested_topic_id = function_args.get("suggested_topic_id")
+                            suggested_topic_name = get_topic_name(suggested_topic_id, preferred_language)
+                            logger.info(f"AI suggesting new topic session: {suggested_topic_id}")
+
+                            assistant_message = get_new_topic_suggestion_message(
+                                suggested_topic_id,
+                                preferred_language
+                            )
+
+                            logger.info("Generated new topic suggestion message, will not store in MongoDB")
+                            messages_collection.delete_one({"message_id": user_message_id})
+                            logger.info(f"Deleted user message {user_message_id} for new topic suggestion")
+
+                            return jsonify({
+                                "response": assistant_message,
+                                "session_id": session_id
+                            })
+
+                        else:
+                            logger.warning(f"Unknown tool call function: {tool_call.function.name}")
+                            tool_response = "Error: Unknown function called."
+
+                        # which tool_call, must append the corresponding "tool" message, ensure the next call is legal
                         messages.append({
                             "role": "tool",
                             "tool_call_id": tool_call.id,
                             "content": tool_response
-                        })
-                        
-                    elif tool_call.function.name == "suggest_new_topic_session":
-                        import json
-                        function_args = json.loads(tool_call.function.arguments)
-                        suggested_topic_id = function_args.get("suggested_topic_id")
-                        
-                        # Get the topic name based on the topic ID and user's language
-                        suggested_topic_name = get_topic_name(suggested_topic_id, preferred_language)
-                        
-                        logger.info(f"AI suggesting new topic session: {suggested_topic_id}")
-                        
-                        # Generate the new topic suggestion message using utils
-                        assistant_message = get_new_topic_suggestion_message(
-                            suggested_topic_id, 
-                            preferred_language
-                        )
-                        
-                        logger.info("Generated new topic suggestion message, will not store in MongoDB")
-                        
-                        # Delete the user message from MongoDB since we're not storing this GPT response
-                        messages_collection.delete_one({"message_id": user_message_id})
-                        logger.info(f"Deleted user message {user_message_id} for new topic suggestion")
-                        
-                        # Skip saving this message to MongoDB and return immediately
-                        return jsonify({
-                            "response": assistant_message,
-                            "session_id": session_id
-                        })
-                        
-                    else:
-                        logger.warning(f"Unknown tool call function: {tool_call.function.name}")
-                        # Add error response to messages
-                        messages.append({
-                            "role": "tool",
-                            "tool_call_id": tool_call.id,
-                            "content": "Error: Unknown function called."
                         })
                     
                     # Make second API call to get GPT's response based on tool results
                     try:
-                        # Add a guidance message for the second call to ensure GPT responds appropriately
-                        if tool_call.function.name == "update_user_progression":
+                        # Add guidance message based on which tools were called
+                        tool_names = [tc.function.name for tc in tool_calls]
+                        
+                        if "update_user_progression" in tool_names:
                             # Add guidance for progression tool response
                             messages.append({
                                 "role": "system",
@@ -374,12 +364,13 @@ def create_chat_routes(sessions_collection, messages_collection, client, gmt8, l
                                     "Do not mention tools or progression explicitly."
                                 )
                             })
-                        elif tool_call.function.name == "set_current_topic":
-                            # Add guidance for topic setting response
+                        elif "set_current_topic" in tool_names:
+                            # Add guidance for topic setting response with updated topic
+                            topic_name = get_topic_name(current_topic, preferred_language)
                             messages.append({
                                 "role": "system", 
                                 "content": (
-                                    "You have set the session topic. Now begin teaching this topic by: "
+                                    f"You have set the session topic to '{topic_name}' (ID: {current_topic}). Now begin teaching this topic by: "
                                     "1. Briefly introducing a basic concept or question to assess the user's familiarity. "
                                     "2. Avoid listing subtopics; instead, choose one simple example to engage the user. "
                                     "3. Ask the user to try something or share what they find confusing about the topic. "
@@ -395,7 +386,7 @@ def create_chat_routes(sessions_collection, messages_collection, client, gmt8, l
                         logger.info("Second GPT call successful - got text response after tool execution")
                     except Exception as second_api_error:
                         logger.error(f"Failed second GPT API call: {str(second_api_error)}")
-                        assistant_message = "I've processed your request. How can I help you further?"
+                        assistant_message = "I've processed your request"
                         
                 else:
                     # No tool calls, use the original response
