@@ -223,7 +223,7 @@ def create_chat_routes(sessions_collection, messages_collection, client, gmt8, l
                 if not current_topic:
                     api_params["tools"] = tools_schema
                     api_params["tool_choice"] = "auto"
-                    logger.info("Using topic detection and new topic suggestion tools.")
+                    logger.info("Using topic detection and new topic suggestion tools.") 
                 elif current_topic:
                     # Add progression tools and new topic suggestion tools for existing topic
                     progression_tools = get_progression_tools_schema(current_topic)
