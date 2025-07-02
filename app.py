@@ -175,3 +175,10 @@ if __name__ == '__main__':
     app = create_app()
     setup_indexes()
     app.run(debug=True, threaded=False, use_reloader=True, host='0.0.0.0')
+    
+#for replit
+# if __name__ == '__main__':
+#     app = create_app()
+#     setup_indexes()
+#     port = int(os.environ.get('PORT', 5000))
+#     app.run(debug=False, threaded=True, use_reloader=False, host='0.0.0.0', port=port)
